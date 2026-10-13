@@ -6,6 +6,8 @@ import { useMapStyle } from "../utils/useMapStyle";
 import type { Scale } from "../utils/sizes";
 import type { Pos } from "../utils/wall";
 import { GroupChip, LoadBar, ModeSwitch, ModeSwitchGeneric, Notice, NumberField, Select, SettingsGroup, Stat } from "./ui";
+import PortOptimiser from "./PortOptimiser";
+import { portOptions } from "../utils/portOptions";
 import { multicoreNames, type PowerPlan, type PowerSettings } from "../utils/powerPlan";
 
 type Props = {
@@ -52,6 +54,23 @@ export default function PowerWeightPlanner({
     () => (plan ? powerCells(plan, wide, numberingMode, three, removed, scale) : []),
     [plan, wide, numberingMode, three, removed, scale]
   );
+
+  const circuitChoices = useMemo(
+    () =>
+      plan && plan.fits
+        ? portOptions({
+            totalCabinets: plan.cabinetCount,
+            lineLength: settings.grouping === "columns" ? cells.length : cells[0]?.length ?? 0,
+            cabinetPixels: plan.cabinetAmps * (plan.cabinetCount > 0 ? plan.totalWatts / plan.cabinetWatts / plan.cabinetCount : 1),
+            pixelsPerPort: plan.usableAmps,
+            wholeLines: settings.wholeLines,
+            portLimit: 0,
+          })
+        : [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [plan, settings.grouping, settings.wholeLines, cells]
+  );
+
 
   const [variant, pickVariant] = useMapStyle();
   const circuitInfo = (i: number) => {
@@ -152,6 +171,37 @@ export default function PowerWeightPlanner({
             </SettingsGroup>
           </div>
         </div>
+
+        {!custom && (
+          <div className="mt-4 flex flex-wrap items-end gap-x-6 gap-y-3">
+            <div className="w-44">
+              <NumberField
+                label="Circuits to use (0 = automatic)"
+                value={settings.circuitCount ?? 0}
+                min={0}
+                onChange={(n) => update("circuitCount", Math.max(0, Math.floor(n) || 0))}
+              />
+            </div>
+            <p className="text-xs text-zinc-500 pb-2">
+              {plan
+                ? settings.circuitCount > 0
+                  ? `Spreading the wall over ${plan.circuits.length} circuit${plan.circuits.length === 1 ? "" : "s"}.`
+                  : `Automatic uses as few circuits as fit (${plan.circuits.length}).`
+                : ""}
+            </p>
+          </div>
+        )}
+
+        {settings.supply === "three" && (
+          <label className="mt-4 flex items-center gap-2 text-sm text-zinc-300">
+            <input
+              type="checkbox"
+              checked={settings.balancePhases ?? true}
+              onChange={(e) => update("balancePhases", e.target.checked)}
+            />
+            Balance the three phases by load (heaviest circuits first) instead of taking turns
+          </label>
+        )}
 
         {!custom && (
           <label className="mt-4 flex items-center gap-2 text-sm text-zinc-300">
@@ -256,7 +306,18 @@ export default function PowerWeightPlanner({
             />
           </div>
 
-          <div className="panel">
+          <PortOptimiser
+              options={circuitChoices}
+              noun="circuit"
+              current={plan.circuits.length}
+              limitText="the multicore plan allows"
+              onApply={(n) => {
+                setCustomCircuits(null);
+                update("circuitCount", n);
+              }}
+            />
+
+            <div className="panel">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <h2 className="panel-title !mb-0">Power map</h2>
               <ModeSwitchGeneric

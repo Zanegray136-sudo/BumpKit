@@ -1,5 +1,5 @@
 import { describeLabels, getCabinetLabel } from "./cabinetLabels";
-import { suggestCounts } from "./grouping";
+import { suggestCounts, suggestCountsForGroups } from "./grouping";
 import { arrowBetween } from "./dataPlan";
 import { eqAt, eqCount, noScale, rowF, colF, type Scale } from "./sizes";
 import { activeCabinets, cleanGroups, keyOf, tallestColumn, type Pos } from "./wall";
@@ -31,6 +31,10 @@ export type PowerSettings = {
   grouping: "rows" | "columns";
   /** Keep suggested circuits to whole rows/columns where they fit */
   wholeLines: boolean;
+  /** Circuits the suggested plan spreads the wall over, 0 = as few as fit */
+  circuitCount: number;
+  /** Share circuits across the phases by load rather than taking turns */
+  balancePhases: boolean;
   /** Carry circuits in a multicore cable (Socapex or Wieland) */
   multicore: "none" | "socapex" | "wieland";
   /** Circuits in each multicore cable, 4 to 6 */
@@ -78,6 +82,8 @@ export const defaultPowerSettings: PowerSettings = {
   maxStack: 0,
   grouping: "rows",
   wholeLines: true,
+  circuitCount: 0,
+  balancePhases: true,
   multicore: "none",
   circuitsPerMulti: 6,
   crew: 0,
@@ -207,9 +213,12 @@ export function calcPowerPlan(
     : 0;
 
   const lineLength = s.grouping === "columns" ? high : wide;
-  const counts = fits
-    ? suggestCounts(cabinetCount, lineLength, cabinetsPerCircuit, s.wholeLines)
-    : [];
+  const wanted = Math.floor(s.circuitCount ?? 0);
+  const counts = !fits
+    ? []
+    : wanted > 0
+    ? suggestCountsForGroups(cabinetCount, lineLength, wanted, s.wholeLines)
+    : suggestCounts(cabinetCount, lineLength, cabinetsPerCircuit, s.wholeLines);
 
   // Cabinets in the order circuits fill them. Snaking keeps each
   // circuit's cabinets next to each other so the power links stay short.
@@ -280,6 +289,22 @@ export function calcPowerPlan(
     });
   });
 
+  // Phases: take turns, or give each circuit (heaviest first) to the lightest phase.
+  const circuitAmps = circuitCells.map(
+    (members) => members.reduce((sum, m) => sum + cabinetWatts * eqAt(scale, m.row, m.col), 0) / (s.voltage * pf)
+  );
+  const phaseOf: number[] = circuitCells.map((_, i) => i % 3);
+  if (s.supply === "three" && (s.balancePhases ?? true)) {
+    const load = [0, 0, 0];
+    [...circuitAmps.keys()]
+      .sort((a, b) => circuitAmps[b] - circuitAmps[a] || a - b)
+      .forEach((i) => {
+        const k = load.indexOf(Math.min(...load));
+        phaseOf[i] = k;
+        load[k] += circuitAmps[i];
+      });
+  }
+
   const circuits: PowerCircuit[] = circuitCells.map((members, i) => {
     members.forEach((m) => {
       cellCircuit[m.row][m.col] = i + 1;
@@ -298,7 +323,7 @@ export function calcPowerPlan(
       watts,
       amps,
       loadPct: usableAmps > 0 ? (amps / usableAmps) * 100 : 0,
-      phase: s.supply === "three" ? `L${(i % 3) + 1}` : "-",
+      phase: s.supply === "three" ? `L${phaseOf[i] + 1}` : "-",
       multi: multiOf(i + 1).label,
       channel: multiOf(i + 1).channel,
     };

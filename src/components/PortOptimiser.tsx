@@ -1,6 +1,4 @@
-import { useMemo } from "react";
-import { portOptions } from "../utils/portOptions";
-import type { DataPlan } from "../utils/dataPlan";
+import type { PortOption } from "../utils/portOptions";
 
 const TAG_TEXT = {
   fewest: "Fewest ports",
@@ -8,56 +6,41 @@ const TAG_TEXT = {
   even: "Most even",
 } as const;
 
-/** Compare port counts for the wall and apply one in a click. */
+/** Compare counts of ports or circuits for the wall and apply one in a click. */
 export default function PortOptimiser({
-  plan,
-  lineLength,
-  wholeLines,
-  portLimit,
+  options,
+  noun,
   current,
+  limitText,
   onApply,
 }: {
-  plan: DataPlan;
-  lineLength: number;
-  wholeLines: boolean;
-  /** Ports the processor can give this plan (0 = unknown) */
-  portLimit: number;
-  /** Ports in the plan now */
+  options: PortOption[];
+  /** "port" or "circuit" */
+  noun: string;
+  /** Count in the plan now */
   current: number;
-  onApply: (ports: number) => void;
+  /** What the "too many" flag refers to, e.g. "the processor has" */
+  limitText: string;
+  onApply: (count: number) => void;
 }) {
-  const rows = useMemo(() => {
-    const withLoad = plan.ports.find((p) => p.loadPct > 0 && p.cabinets > 0);
-    if (!withLoad || plan.assigned === 0) return [];
-    const px = plan.ports.reduce((n, p) => n + p.pixels, 0) / plan.assigned;
-    const capacity = (withLoad.pixels / withLoad.loadPct) * 100;
-    return portOptions({
-      totalCabinets: plan.totalCabinets,
-      lineLength,
-      cabinetPixels: px,
-      pixelsPerPort: capacity,
-      wholeLines,
-      portLimit,
-    });
-  }, [plan, lineLength, wholeLines, portLimit]);
-
+  const rows = options;
   if (rows.length < 2) return null;
 
   return (
     <div className="panel">
       <div className="mb-3">
-        <h2 className="panel-title !mb-1">Optimise ports</h2>
+        <h2 className="panel-title !mb-1">Optimise {noun}s</h2>
         <p className="text-sm text-zinc-400">
-          Fewer ports means fewer cables; more ports means each one runs cooler. Pick a count to apply it to the suggested plan.
+          Fewer {noun}s means fewer cables; more {noun}s means each one runs cooler. Pick a count to apply it to the suggested plan.
         </p>
       </div>
       <div className="overflow-x-auto">
         <table className="data-table">
           <thead>
             <tr>
-              <th>Ports</th>
-              <th>Cabinets per port</th>
-              <th>Busiest port</th>
+              <th className="capitalize">{noun}s</th>
+              <th>Cabinets per {noun}</th>
+              <th>Busiest {noun}</th>
               <th>Layout</th>
               <th />
               <th />
@@ -74,7 +57,7 @@ export default function PortOptimiser({
                 <td className="text-zinc-400">{r.wholeLines ? "Whole lines" : "Mixed"}</td>
                 <td className="text-xs text-emerald-300">
                   {r.tags.map((t) => TAG_TEXT[t]).join(", ")}
-                  {r.tooMany && <span className="text-red-300">More than the processor has</span>}
+                  {r.tooMany && <span className="text-red-300">More than {limitText}</span>}
                 </td>
                 <td className="text-right">
                   {r.ports === current ? (

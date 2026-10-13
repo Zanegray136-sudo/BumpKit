@@ -5,6 +5,7 @@ import { dataCells } from "../utils/mapCells";
 import GroupPainter from "./GroupPainter";
 import WiringPicker from "./WiringPicker";
 import PortOptimiser from "./PortOptimiser";
+import { portOptions } from "../utils/portOptions";
 import { useMapStyle } from "../utils/useMapStyle";
 import type { Pos } from "../utils/wall";
 import { GroupChip, LoadBar, NumberField, ModeSwitch, ModeSwitchGeneric, Notice, Select, SettingsGroup, Stat, Toggle } from "./ui";
@@ -64,6 +65,20 @@ export default function DataPlanner({
     () => dataCells(plan, wide, numberingMode, redundancy, scale),
     [plan, wide, numberingMode, redundancy, scale]
   );
+
+  const lineLength = settings.direction === "vertical" ? cells.length : cells[0]?.length ?? 0;
+  const portChoices = useMemo(() => {
+    const withLoad = plan.ports.find((p) => p.loadPct > 0 && p.cabinets > 0);
+    if (!withLoad || plan.assigned === 0) return [];
+    return portOptions({
+      totalCabinets: plan.totalCabinets,
+      lineLength,
+      cabinetPixels: plan.ports.reduce((n, p) => n + p.pixels, 0) / plan.assigned,
+      pixelsPerPort: (withLoad.pixels / withLoad.loadPct) * 100,
+      wholeLines: settings.wholeLines,
+      portLimit: processorPorts > 0 ? Math.floor(processorPorts / (redundancy === "backup" && backupSame ? 2 : 1)) : 0,
+    });
+  }, [plan, lineLength, settings.wholeLines, processorPorts, redundancy, backupSame]);
 
   const overPorts = plan.ports.filter((p) => p.over);
   const backupOn = redundancy === "backup";
@@ -198,11 +213,10 @@ export default function DataPlanner({
       )}
 
       <PortOptimiser
-        plan={plan}
-        lineLength={settings.direction === "vertical" ? cells.length : cells[0]?.length ?? 0}
-        wholeLines={settings.wholeLines}
-        portLimit={processorPorts > 0 ? Math.floor(processorPorts / (backupOn && backupSame ? 2 : 1)) : 0}
+        options={portChoices}
+        noun="port"
         current={plan.ports.length}
+        limitText="the processor has"
         onApply={(n) => {
           setCustomChains(null);
           update({ portCount: n });
