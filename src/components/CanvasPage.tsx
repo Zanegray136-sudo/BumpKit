@@ -77,13 +77,20 @@ export default function CanvasPage({
   // (and let typing in the name box stay responsive).
   const deferredTitle = useDeferredValue(shown);
   const [kind, setKind] = useState<"engineering" | UtilityKind>("engineering");
+  // The cable path of every port, one after another, for the cabinet walk.
+  const walkOrder = useMemo(
+    () => dataPlan.chains.flat().map((p) => [p.row, p.col] as [number, number]),
+    [dataPlan]
+  );
+  const [walkStep, setWalkStep] = useState(1);
+  const walkAt = Math.max(0, Math.min(walkStep, walkOrder.length));
   const patternSvg = useMemo(
     () =>
       kind === "engineering"
         ? testPatternSvg({ ...input, title: deferredTitle || "LED wall test pattern" })
-        : utilityPatternSvg(kind, canvas, input.portOf),
+        : utilityPatternSvg(kind, canvas, input.portOf, { order: walkOrder, step: walkAt }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [canvas, dataPlan, numberingMode, deferredTitle, stats, toggles, kind]
+    [canvas, dataPlan, numberingMode, deferredTitle, stats, toggles, kind, walkOrder, walkAt]
   );
   const kindInfo = utilityPatterns.find((u) => u.id === kind);
   // A blob URL avoids percent-encoding a multi-megabyte string.
@@ -93,7 +100,7 @@ export default function CanvasPage({
     setPatternUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [patternSvg]);
-  const fileBase = `${(shown || "wall").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-")}-${kind === "engineering" ? "test-pattern" : kind}`;
+  const fileBase = `${(shown || "wall").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-")}-${kind === "engineering" ? "test-pattern" : kind === "walk" ? `walk-${String(walkAt).padStart(3, "0")}` : kind}`;
 
   return (
     <div className="space-y-4">
@@ -143,7 +150,7 @@ export default function CanvasPage({
         </div>
 
         {view === "pattern" && (
-          <div className="mb-3 max-w-sm">
+          <div className="mb-3 max-w-md">
             <Select
               label="Pattern"
               value={kind}
@@ -154,6 +161,28 @@ export default function CanvasPage({
               ]}
             />
             {kindInfo && <p className="mt-1 text-xs text-zinc-500">{kindInfo.note}</p>}
+            {kind === "walk" && (
+              <div className="mt-3 flex items-center gap-2">
+                <button type="button" className="btn" disabled={walkAt <= 0} onClick={() => setWalkStep(walkAt - 1)} aria-label="Previous cabinet">
+                  Back
+                </button>
+                <input
+                  type="range"
+                  min={0}
+                  max={walkOrder.length}
+                  value={walkAt}
+                  onChange={(e) => setWalkStep(Number(e.target.value))}
+                  className="flex-1"
+                  aria-label="Cabinets lit"
+                />
+                <button type="button" className="btn" disabled={walkAt >= walkOrder.length} onClick={() => setWalkStep(walkAt + 1)} aria-label="Next cabinet">
+                  Next
+                </button>
+                <span className="text-xs text-zinc-400 tabular-nums w-16 text-right">
+                  {walkAt} / {walkOrder.length}
+                </span>
+              </div>
+            )}
           </div>
         )}
 

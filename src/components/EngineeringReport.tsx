@@ -10,6 +10,7 @@ import {
 import { buildCabinetCsv, buildPortCsv } from "../utils/cabinetCsv";
 import { processorSheetText } from "../utils/processorSheet";
 import { Select } from "./ui";
+import { useMapStyle } from "../utils/useMapStyle";
 
 const dot = {
   ok: "bg-emerald-400",
@@ -61,7 +62,8 @@ export default function EngineeringReport({ data }: { data: ReportData }) {
     }
   }, [paper, sections]);
 
-  const options: ReportOptions = { paper, sections, excludeScreens: excluded };
+  const [mapStyle, setMapStyle] = useMapStyle();
+  const options: ReportOptions = { paper, sections, excludeScreens: excluded, mapStyle };
   const checks = reportChecksAll(data);
   const hasErrors = checks.some((c) => c.level === "error");
 
@@ -83,7 +85,7 @@ export default function EngineeringReport({ data }: { data: ReportData }) {
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, paper, sections, excluded]);
+  }, [data, paper, sections, excluded, mapStyle]);
 
   useEffect(
     () => () => {
@@ -150,6 +152,15 @@ export default function EngineeringReport({ data }: { data: ReportData }) {
               options={[
                 { value: "a4", label: "A4" },
                 { value: "letter", label: "US Letter" },
+              ]}
+            />
+            <Select
+              label="Map style"
+              value={mapStyle}
+              onChange={(v) => setMapStyle(v as "card" | "solid")}
+              options={[
+                { value: "card", label: "Cards (outlined)" },
+                { value: "solid", label: "Solid tiles" },
               ]}
             />
             <div className="flex items-center justify-between text-xs">

@@ -217,7 +217,7 @@ export function testPatternSvg(p: PatternInput): string {
 export type UtilityKind =
   | "white" | "red" | "green" | "blue" | "black" | "grey"
   | "ramp-h" | "ramp-v" | "steps" | "bars"
-  | "ports" | "cab-checker" | "pixel-checker" | "lines-h" | "lines-v";
+  | "ports" | "walk" | "cab-checker" | "pixel-checker" | "lines-h" | "lines-v";
 
 export const utilityPatterns: { id: UtilityKind; label: string; note: string }[] = [
   { id: "white", label: "Full white", note: "Check brightness, uniformity and dead or stuck pixels" },
@@ -231,6 +231,7 @@ export const utilityPatterns: { id: UtilityKind; label: string; note: string }[]
   { id: "steps", label: "16 grey steps", note: "Low-level detail and black crush" },
   { id: "bars", label: "Colour bars", note: "Full-screen bars with a grey ramp" },
   { id: "ports", label: "Port colours", note: "Every cabinet filled with its port colour, to check data cabling" },
+  { id: "walk", label: "Cabinet walk", note: "Step along the cable path one cabinet at a time. The white cabinet is the latest one on the cable, so you can check wiring order on site" },
   { id: "cab-checker", label: "Cabinet checkerboard", note: "Cabinet edges and any cabinet in the wrong place" },
   { id: "pixel-checker", label: "1-pixel checkerboard", note: "Pixel mapping and moire. Play at native size" },
   { id: "lines-h", label: "1-pixel horizontal lines", note: "Row mapping and scan problems. Play at native size" },
@@ -241,7 +242,9 @@ export const utilityPatterns: { id: UtilityKind; label: string; note: string }[]
 export function utilityPatternSvg(
   kind: UtilityKind,
   c: CanvasPlan,
-  portOf: (r: number, k: number) => number
+  portOf: (r: number, k: number) => number,
+  /** Cable order for the walk pattern, and how many cabinets are lit */
+  walk?: { order: [number, number][]; step: number }
 ): string {
   const W = c.width;
   const H = c.height;
@@ -296,6 +299,30 @@ export function utilityPatternSvg(
           if (port > 0 && Math.min(cw, ch) >= 40)
             o.push(`<text x="${x + cw / 2}" y="${y + ch / 2 + Math.min(cw, ch) * 0.14}" fill="#000" fill-opacity="0.75" font-family="Helvetica, Arial, sans-serif" font-size="${Math.min(cw, ch) * 0.4}" font-weight="700" text-anchor="middle" shape-rendering="auto">P${port}</text>`);
         }
+      break;
+    }
+    case "walk": {
+      fill("#000");
+      const cutW = new Set(c.cutOut.map(([r, k]) => `${r},${k}`));
+      const order = (walk?.order ?? []).filter(([r, k]) => !cutW.has(`${r},${k}`));
+      const step = Math.max(0, Math.min(walk?.step ?? 0, order.length));
+      // Every cabinet outlined so the unlit ones still show where they are.
+      for (let r = 0; r < c.high; r++)
+        for (let k = 0; k < c.wide; k++) {
+          if (cutW.has(`${r},${k}`)) continue;
+          o.push(`<rect x="${c.colX[k] + 1}" y="${c.rowY[r] + 1}" width="${c.colX[k + 1] - c.colX[k] - 2}" height="${c.rowY[r + 1] - c.rowY[r] - 2}" fill="none" stroke="#333" stroke-width="2"/>`);
+        }
+      order.slice(0, step).forEach(([r, k], i) => {
+        const x = c.colX[k];
+        const y = c.rowY[r];
+        const cw = c.colX[k + 1] - x;
+        const ch = c.rowY[r + 1] - y;
+        const last = i === step - 1;
+        const port = portOf(r, k);
+        o.push(`<rect x="${x}" y="${y}" width="${cw}" height="${ch}" fill="${last ? "#fff" : port > 0 ? colourFor(port) : "#666"}"${last ? "" : ' fill-opacity="0.6"'}/>`);
+        if (Math.min(cw, ch) >= 40)
+          o.push(`<text x="${x + cw / 2}" y="${y + ch / 2 + Math.min(cw, ch) * 0.14}" fill="#000" fill-opacity="${last ? 0.9 : 0.6}" font-family="Helvetica, Arial, sans-serif" font-size="${Math.min(cw, ch) * 0.4}" font-weight="700" text-anchor="middle" shape-rendering="auto">${i + 1}</text>`);
+      });
       break;
     }
     case "cab-checker": {

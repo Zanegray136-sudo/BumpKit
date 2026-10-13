@@ -4,6 +4,7 @@ import CabinetMap, { colourFor } from "./CabinetMap";
 import { dataCells } from "../utils/mapCells";
 import GroupPainter from "./GroupPainter";
 import PortList from "./PortList";
+import WiringPicker from "./WiringPicker";
 import { useMapStyle } from "../utils/useMapStyle";
 import type { Pos } from "../utils/wall";
 import { GroupChip, LoadBar, ModeSwitch, ModeSwitchGeneric, Notice, Select, SettingsGroup, Stat, Toggle } from "./ui";
@@ -88,36 +89,8 @@ export default function DataPlanner({
 
         <div className="grid gap-4 lg:grid-cols-3">
           <div className="lg:col-span-2">
-            <SettingsGroup title="Cable path" cols="sm:grid-cols-3">
-<Select
-            label="Data starts"
-            value={settings.start}
-            onChange={(start) => update({ start })}
-            options={[
-              { value: "top-left", label: "Top left" },
-              { value: "top-right", label: "Top right" },
-              { value: "bottom-left", label: "Bottom left" },
-              { value: "bottom-right", label: "Bottom right" },
-            ]}
-          />
-<Select
-            label="Cable runs"
-            value={settings.direction}
-            onChange={(direction) => update({ direction })}
-            options={[
-              { value: "horizontal", label: "Across (rows)" },
-              { value: "vertical", label: "Up and down (columns)" },
-            ]}
-          />
-<Select
-            label="Routing style"
-            value={settings.style}
-            onChange={(style) => update({ style })}
-            options={[
-              { value: "snake", label: "Snake" },
-              { value: "straight", label: "Straight" },
-            ]}
-          />
+            <SettingsGroup title="Cable path" cols="grid-cols-1">
+              <WiringPicker settings={settings} onChange={update} />
             </SettingsGroup>
           </div>
           <SettingsGroup title="Labels" cols="grid-cols-1">

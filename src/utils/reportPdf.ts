@@ -130,6 +130,8 @@ export type ReportOptions = {
   includePower?: boolean;
   includePickList?: boolean;
   includeCables?: boolean;
+  /** Data and power maps: outlined cards or solid coloured tiles */
+  mapStyle?: "card" | "solid";
 };
 
 import { reportChecks, reportChecksAll, type Check } from "./checks";
@@ -296,7 +298,8 @@ export function buildReport(d: ReportData, o: ReportOptions): jsPDF {
     const cols = cells[0]?.length ?? 0;
     if (!rows || !cols) return;
 
-    const gap = 0.8;
+    const solid = o.mapStyle === "solid";
+    const gap = solid ? 0.6 : 0.8;
     const wf = Array.from({ length: cols }, (_, c) => cells[0][c]?.wf ?? 1);
     const hf = cells.map((row) => row[0]?.hf ?? 1);
     const sumW = wf.reduce((a, v) => a + v, 0);
@@ -329,6 +332,30 @@ export function buildReport(d: ReportData, o: ReportOptions): jsPDF {
         }
 
         const colour = cell.group === 0 ? ([150, 158, 165] as RGB) : hex(colourFor(cell.group));
+
+        if (solid) {
+          // Solid tile: filled with the port colour, cable order large in the middle.
+          const fill = cell.group === 0 ? ([205, 210, 214] as RGB) : colour;
+          doc.setFillColor(...fill);
+          doc.roundedRect(x, yy, w, h, 0.5, 0.5, "F");
+          const seq = cell.note?.replace("#", "") ?? "";
+          const cx = x + w / 2;
+          const big = Math.max(5, Math.min(12, m * 0.5));
+          const DARK: RGB = [11, 13, 16];
+          if (m >= 8) text(cell.label, x + 1, yy + 2.6, Math.max(3.8, Math.min(6, m * 0.22)), "bold", DARK);
+          text(seq || cell.tag, cx, yy + h / 2 + big * 0.14, big, "bold", DARK, "center");
+          if (m >= 8 && cell.group !== 0) text(cell.tag, x + w - 1, yy + 2.6, Math.max(3.8, Math.min(6, m * 0.22)), "bold", DARK, "right");
+          // The run ends here: a dark cap on the edge the cable leaves by.
+          if (m >= 5 && cell.end && cell.arrow) {
+            doc.setFillColor(0, 0, 0);
+            const horiz = cell.arrow === "→" || cell.arrow === "←";
+            const ex = cell.arrow === "→" ? x + w - 0.9 : x;
+            const ey = cell.arrow === "↓" ? yy + h - 0.9 : yy;
+            doc.rect(horiz ? ex : x, horiz ? yy : ey, horiz ? 0.9 : w, horiz ? h : 0.9, "F");
+          }
+          return;
+        }
+
         doc.setFillColor(...tint(colour, 0.82));
         doc.setDrawColor(...colour);
         doc.setLineWidth(0.35);
@@ -362,7 +389,9 @@ export function buildReport(d: ReportData, o: ReportOptions): jsPDF {
         prow.forEach((p, c) => {
           const cell = cells[r][c];
           if (!p) return;
-          const col = (cell.group === 0 ? ([150, 158, 165] as RGB) : hex(colourFor(cell.group))).map((v) => Math.round(v * 0.72)) as RGB;
+          const col = solid
+            ? ([11, 13, 16] as RGB)
+            : ((cell.group === 0 ? ([150, 158, 165] as RGB) : hex(colourFor(cell.group))).map((v) => Math.round(v * 0.72)) as RGB);
           const ox = x0 + colX[c];
           const oy = y + rowY[r];
           const sx = colW[c];
