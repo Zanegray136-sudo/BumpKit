@@ -463,15 +463,13 @@ export function buildReport(d: ReportData, o: ReportOptions): jsPDF {
 
   const logo = getLogo();
   if (logo) {
-    // On a white tile so any logo colour stays readable on the dark band.
+    // Drawn straight onto the dark band, so a transparent PNG shows through.
     const boxH = 17;
     const maxW = 52;
     const k = Math.min((boxH - 4) / logo.height, (maxW - 4) / logo.width);
     const lw = logo.width * k;
     const lh = logo.height * k;
     const bx = W - M - (lw + 4);
-    doc.setFillColor(255, 255, 255);
-    doc.roundedRect(bx, 5, lw + 4, boxH, 1.5, 1.5, "F");
     try {
       doc.addImage(logo.dataUrl, "PNG", bx + 2, 5 + (boxH - lh) / 2, lw, lh, undefined, "FAST");
     } catch {

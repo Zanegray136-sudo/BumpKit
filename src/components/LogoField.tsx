@@ -21,7 +21,7 @@ export default function LogoField() {
     <div className="rounded-lg border border-zinc-800 bg-zinc-950/40 p-3">
       <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">Company logo</div>
       <div className="flex flex-wrap items-center gap-3">
-        <div className="grid h-14 w-36 place-items-center rounded-md bg-white p-1.5">
+        <div className="grid h-14 w-36 place-items-center rounded-md bg-[#0e1012] border border-zinc-800 p-1.5">
           {logo ? (
             <img src={logo.dataUrl} alt="Company logo" className="max-h-full max-w-full object-contain" />
           ) : (

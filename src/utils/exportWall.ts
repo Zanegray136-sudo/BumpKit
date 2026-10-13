@@ -66,7 +66,6 @@ export function wallToSvg(d: WallDrawing): string {
     const lh = d.logo.height * k;
     const bx = width - 20 - (lw + 10);
     parts.push(
-      `<rect x="${bx}" y="10" width="${lw + 10}" height="${boxH}" rx="6" fill="#ffffff"/>`,
       `<image href="${d.logo.dataUrl}" x="${bx + 5}" y="${10 + (boxH - lh) / 2}" width="${lw}" height="${lh}"/>`
     );
   }
