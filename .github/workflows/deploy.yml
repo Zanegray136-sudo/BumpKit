@@ -19,6 +19,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Tries to switch Pages on if it is off. If the token isn't allowed to, set
+      # Settings > Pages > Source to "GitHub Actions" by hand instead.
+      - uses: actions/configure-pages@v5
+        continue-on-error: true
+        with:
+          enablement: true
       - uses: actions/setup-node@v4
         with:
           node-version: 22
