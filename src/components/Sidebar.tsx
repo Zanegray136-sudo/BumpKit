@@ -24,7 +24,7 @@ export default function Sidebar({ current, onSelect, done, issues = {}, onInstal
           <span className="bg-blue-400/50 rounded-sm" />
           <span className="bg-blue-400 rounded-sm" />
         </span>
-        <span className="font-semibold text-zinc-50">Open AV Toolkit</span>
+        <span className="font-semibold text-zinc-50">PixelPatch</span>
       </div>
 
       <ol className="py-3">

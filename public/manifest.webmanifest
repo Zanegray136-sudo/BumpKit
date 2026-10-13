@@ -1,6 +1,6 @@
 {
-  "name": "Open AV Toolkit",
-  "short_name": "AV Toolkit",
+  "name": "PixelPatch",
+  "short_name": "PixelPatch",
   "description": "Plan LED walls: data, power, rigging, cables, pick list and report.",
   "start_url": "./",
   "scope": "./",

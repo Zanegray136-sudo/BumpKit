@@ -252,7 +252,7 @@ function App() {
       .then((text) => {
         const parsed = parseProject(text);
         if (!parsed) {
-          window.alert("That file isn't an Open AV Toolkit project.");
+          window.alert("That file isn't a PixelPatch project.");
           return;
         }
         load(parsed);
@@ -985,7 +985,7 @@ function App() {
             </div>
           )}
           <footer className="mt-10 border-t border-zinc-800 pt-4 text-xs text-zinc-500">
-            Open AV Toolkit gives planning estimates for LED walls. Check the figures against the manufacturer&apos;s
+            PixelPatch gives planning estimates for LED walls. Check the figures against the manufacturer&apos;s
             data, and have rigging, ballast and electrical designs signed off by a qualified person before use.
             Your projects stay in this browser unless you save a file or copy a share link.
           </footer>

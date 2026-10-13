@@ -1085,7 +1085,7 @@ export function buildReport(d: ReportData, o: ReportOptions): jsPDF {
     rule(H - 13);
     text(`${d.project.revision || "Rev A"}`, M, H - 8, 8, "normal", MUTED);
     text(`Page ${i} of ${pages}`, W - M, H - 8, 8, "normal", MUTED, "right");
-    text("Generated with Open AV Toolkit", W / 2, H - 8, 8, "normal", MUTED, "center");
+    text("Generated with PixelPatch", W / 2, H - 8, 8, "normal", MUTED, "center");
   }
 
   return doc;
