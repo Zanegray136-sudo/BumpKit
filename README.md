@@ -33,8 +33,8 @@ All figures are planning estimates and are not a structural or electrical sign-o
 The app is a static site with no server or database. `npm run build` writes it to `dist/`.
 
 - **Netlify, Vercel or Cloudflare Pages:** connect the repository, build command `npm run build`, output folder `dist`. No other settings.
-- **GitHub Pages:** push to `main` and the workflow in `.github/workflows/deploy.yml` builds and deploys it. In the repository settings, set Pages > Source to "GitHub Actions". The workflow sets `BASE_PATH` to the repository name so the site works at `user.github.io/repo-name/`.
-- **Anywhere else:** upload the contents of `dist/`. If the site is not at the root of its domain, build with `BASE_PATH=/folder/ npm run build`.
+- **GitHub Pages:** push to `main` and the workflow in `.github/workflows/deploy.yml` builds and deploys it. In the repository settings, set Pages > Source to "GitHub Actions". The site is built with relative paths, so it works at `user.github.io/repo-name/` and survives renaming the repository.
+- **Anywhere else:** upload the contents of `dist/`. It works from any folder or domain.
 
 ## Development
 
