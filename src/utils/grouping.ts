@@ -39,6 +39,33 @@ export function suggestCounts(
   return balancedSplit(total, balancedGroups);
 }
 
+/**
+ * Splits `total` cabinets into exactly `groups` groups (as far as there are
+ * cabinets), using whole lines where that is possible.
+ */
+export function suggestCountsForGroups(
+  total: number,
+  lineLength: number,
+  groups: number,
+  wholeLines: boolean
+): number[] {
+  const n = Math.min(Math.max(1, Math.floor(groups)), total);
+  if (total <= 0) return [];
+
+  const totalLines = lineLength > 0 ? Math.ceil(total / lineLength) : 0;
+  if (wholeLines && totalLines >= n) {
+    const base = Math.floor(totalLines / n);
+    const extra = totalLines % n;
+    let left = total;
+    return Array.from({ length: n }, (_, i) => {
+      const c = Math.min(left, (base + (i < extra ? 1 : 0)) * lineLength);
+      left -= c;
+      return c;
+    });
+  }
+  return balancedSplit(total, n);
+}
+
 function balancedSplit(total: number, groups: number): number[] {
   const base = Math.floor(total / groups);
   const extra = total % groups;

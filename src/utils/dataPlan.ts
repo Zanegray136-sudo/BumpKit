@@ -1,5 +1,5 @@
 import type { Cell } from "./cabinetLabels";
-import { suggestCounts } from "./grouping";
+import { suggestCounts, suggestCountsForGroups } from "./grouping";
 import { cleanGroups, inWall, type Pos } from "./wall";
 
 export type DataSettings = {
@@ -8,6 +8,8 @@ export type DataSettings = {
   direction: string; // horizontal | vertical
   /** Keep suggested ports to whole rows/columns where they fit */
   wholeLines: boolean;
+  /** Ports the suggested plan spreads the wall over, 0 = as few as fit */
+  portCount: number;
 };
 
 export const defaultDataSettings: DataSettings = {
@@ -15,6 +17,7 @@ export const defaultDataSettings: DataSettings = {
   style: "snake",
   direction: "horizontal",
   wholeLines: true,
+  portCount: 0,
 };
 
 export type DataPort = {
@@ -114,12 +117,11 @@ export function calcDataPlan(args: {
       : Math.max(1, totalCabinets);
 
   const lineLength = settings.direction === "vertical" ? high : wide;
-  const counts = suggestCounts(
-    totalCabinets,
-    lineLength,
-    maxPerPort,
-    settings.wholeLines
-  );
+  const wanted = Math.floor(settings.portCount ?? 0);
+  const counts =
+    wanted > 0
+      ? suggestCountsForGroups(totalCabinets, lineLength, wanted, settings.wholeLines)
+      : suggestCounts(totalCabinets, lineLength, maxPerPort, settings.wholeLines);
 
   let at = 0;
   const suggestedChains: Pos[][] = counts.map((count) => {

@@ -6,7 +6,7 @@ import GroupPainter from "./GroupPainter";
 import WiringPicker from "./WiringPicker";
 import { useMapStyle } from "../utils/useMapStyle";
 import type { Pos } from "../utils/wall";
-import { GroupChip, LoadBar, ModeSwitch, ModeSwitchGeneric, Notice, Select, SettingsGroup, Stat, Toggle } from "./ui";
+import { GroupChip, LoadBar, NumberField, ModeSwitch, ModeSwitchGeneric, Notice, Select, SettingsGroup, Stat, Toggle } from "./ui";
 import { getPortRanges } from "../utils/cabinetLabels";
 import type { DataPlan, DataSettings } from "../utils/dataPlan";
 
@@ -130,6 +130,24 @@ export default function DataPlanner({
               : "Backup runs from a second processor"}
           </span>
         </div>
+
+        {!custom && (
+          <div className="mt-4 flex flex-wrap items-end gap-x-6 gap-y-3">
+            <div className="w-44">
+              <NumberField
+                label="Ports to use (0 = automatic)"
+                value={settings.portCount ?? 0}
+                min={0}
+                onChange={(n) => update({ portCount: Math.max(0, Math.floor(n) || 0) })}
+              />
+            </div>
+            <p className="text-xs text-zinc-500 pb-2">
+              {settings.portCount > 0
+                ? `Spreading the wall over ${plan.ports.length} port${plan.ports.length === 1 ? "" : "s"}. Up to ${plan.maxPerPort} cabinets fit on one.`
+                : `Automatic uses as few ports as fit (${plan.ports.length}).`}
+            </p>
+          </div>
+        )}
 
         {!custom && (
           <label className="mt-4 flex items-center gap-2 text-sm text-zinc-300">
