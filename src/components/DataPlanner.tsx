@@ -4,6 +4,7 @@ import { colourFor } from "./CabinetMap";
 import { dataCells } from "../utils/mapCells";
 import GroupPainter from "./GroupPainter";
 import WiringPicker from "./WiringPicker";
+import PortOptimiser from "./PortOptimiser";
 import { useMapStyle } from "../utils/useMapStyle";
 import type { Pos } from "../utils/wall";
 import { GroupChip, LoadBar, NumberField, ModeSwitch, ModeSwitchGeneric, Notice, Select, SettingsGroup, Stat, Toggle } from "./ui";
@@ -195,6 +196,18 @@ export default function DataPlanner({
           )}
         </div>
       )}
+
+      <PortOptimiser
+        plan={plan}
+        lineLength={settings.direction === "vertical" ? cells.length : cells[0]?.length ?? 0}
+        wholeLines={settings.wholeLines}
+        portLimit={processorPorts > 0 ? Math.floor(processorPorts / (backupOn && backupSame ? 2 : 1)) : 0}
+        current={plan.ports.length}
+        onApply={(n) => {
+          setCustomChains(null);
+          update({ portCount: n });
+        }}
+      />
 
       <div className="panel">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
