@@ -1,9 +1,8 @@
 import type { Scale } from "../utils/sizes";
 import { useMemo } from "react";
-import CabinetMap, { colourFor } from "./CabinetMap";
+import { colourFor } from "./CabinetMap";
 import { dataCells } from "../utils/mapCells";
 import GroupPainter from "./GroupPainter";
-import PortList from "./PortList";
 import WiringPicker from "./WiringPicker";
 import { useMapStyle } from "../utils/useMapStyle";
 import type { Pos } from "../utils/wall";
@@ -192,38 +191,26 @@ export default function DataPlanner({
             ]}
           />
         </div>
-        {custom ? (
-          <GroupPainter
-            prefix="P"
-            noun="port"
-            ordered
-            backup={redundancy === "backup"}
-            groups={plan.chains}
-            onChange={setCustomChains}
-            onResetToSuggested={() =>
-              setCustomChains(plan.suggestedChains.map((x) => [...x]))
-            }
-            cells={cells}
-            variant={variant}
-            info={portInfo}
-            unassigned={plan.unassigned}
-          />
-        ) : (
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
-            <CabinetMap cells={cells} variant={variant} />
-            <PortList
-              items={plan.ports.map((p) => ({
-                colour: colourFor(p.port),
-                name: `P${String(p.port).padStart(2, "0")}`,
-                sub: backupOn ? `BP${String(p.port).padStart(2, "0")}` : undefined,
-                count: p.cabinets,
-                detail: `${(p.pixels / 1000).toFixed(0)}k px`,
-                pct: p.loadPct,
-                over: p.over,
-              }))}
-            />
-          </div>
+        {!custom && (
+          <p className="mb-3 text-sm text-zinc-400">
+            This is the suggested plan. Pick a port and click or drag cabinets to move them, and the plan becomes your own.
+          </p>
         )}
+        <GroupPainter
+          prefix="P"
+          noun="port"
+          ordered
+          backup={redundancy === "backup"}
+          groups={plan.chains}
+          onChange={setCustomChains}
+          onResetToSuggested={() =>
+            setCustomChains(plan.suggestedChains.map((x) => [...x]))
+          }
+          cells={cells}
+          variant={variant}
+          info={portInfo}
+          unassigned={plan.unassigned}
+        />
       </div>
 
       <div className="panel">

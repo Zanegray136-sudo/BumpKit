@@ -1,8 +1,7 @@
 import { useMemo } from "react";
-import CabinetMap, { colourFor } from "./CabinetMap";
+import { colourFor } from "./CabinetMap";
 import { powerCells } from "../utils/mapCells";
 import GroupPainter from "./GroupPainter";
-import PortList from "./PortList";
 import { useMapStyle } from "../utils/useMapStyle";
 import type { Scale } from "../utils/sizes";
 import type { Pos } from "../utils/wall";
@@ -270,34 +269,25 @@ export default function PowerWeightPlanner({
                 ]}
               />
             </div>
-            {custom ? (
-              <GroupPainter
-                prefix="C"
-                noun="circuit"
-                ordered
-                groups={plan.circuitCells}
-                onChange={setCustomCircuits}
-                onResetToSuggested={() =>
-                  setCustomCircuits(plan.suggestedCircuits.map((x) => [...x]))
-                }
-                cells={cells}
-                variant={variant}
-                info={circuitInfo}
-                unassigned={plan.unassigned}
-              />
-            ) : (
-              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
-                <CabinetMap cells={cells} variant={variant} />
-                <PortList
-                  items={plan.circuits.map((c, i) => ({
-                    colour: colourFor(c.number),
-                    name: `C${String(c.number).padStart(2, "0")}`,
-                    count: c.cabinets,
-                    ...circuitInfo(i),
-                  }))}
-                />
-              </div>
+            {!custom && (
+              <p className="mb-3 text-sm text-zinc-400">
+                This is the suggested plan. Pick a circuit and click or drag cabinets to move them, and the plan becomes your own.
+              </p>
             )}
+            <GroupPainter
+              prefix="C"
+              noun="circuit"
+              ordered
+              groups={plan.circuitCells}
+              onChange={setCustomCircuits}
+              onResetToSuggested={() =>
+                setCustomCircuits(plan.suggestedCircuits.map((x) => [...x]))
+              }
+              cells={cells}
+              variant={variant}
+              info={circuitInfo}
+              unassigned={plan.unassigned}
+            />
           </div>
 
           <div className="panel">
