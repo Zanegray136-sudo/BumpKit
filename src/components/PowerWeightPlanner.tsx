@@ -306,18 +306,7 @@ export default function PowerWeightPlanner({
             />
           </div>
 
-          <PortOptimiser
-              options={circuitChoices}
-              noun="circuit"
-              current={plan.circuits.length}
-              limitText="the multicore plan allows"
-              onApply={(n) => {
-                setCustomCircuits(null);
-                update("circuitCount", n);
-              }}
-            />
-
-            <div className="panel">
+          <div className="panel">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <h2 className="panel-title !mb-0">Power map</h2>
               <ModeSwitchGeneric
@@ -350,6 +339,17 @@ export default function PowerWeightPlanner({
               unassigned={plan.unassigned}
             />
           </div>
+
+          <PortOptimiser
+              options={circuitChoices}
+              noun="circuit"
+              current={plan.circuits.length}
+              limitText="the multicore plan allows"
+              onApply={(n) => {
+                setCustomCircuits(null);
+                update("circuitCount", n);
+              }}
+            />
 
           <div className="panel">
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-zinc-800">

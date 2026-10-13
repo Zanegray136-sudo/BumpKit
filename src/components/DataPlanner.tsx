@@ -212,17 +212,6 @@ export default function DataPlanner({
         </div>
       )}
 
-      <PortOptimiser
-        options={portChoices}
-        noun="port"
-        current={plan.ports.length}
-        limitText="the processor has"
-        onApply={(n) => {
-          setCustomChains(null);
-          update({ portCount: n });
-        }}
-      />
-
       <div className="panel">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="panel-title !mb-0">Data map</h2>
@@ -257,6 +246,17 @@ export default function DataPlanner({
           unassigned={plan.unassigned}
         />
       </div>
+
+      <PortOptimiser
+        options={portChoices}
+        noun="port"
+        current={plan.ports.length}
+        limitText="the processor has"
+        onApply={(n) => {
+          setCustomChains(null);
+          update({ portCount: n });
+        }}
+      />
 
       <div className="panel">
         <div className="flex items-center justify-between mb-4 pb-3 border-b border-zinc-800">
