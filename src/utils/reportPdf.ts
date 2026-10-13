@@ -952,8 +952,8 @@ export function buildReport(d: ReportData, o: ReportOptions): jsPDF {
     ]);
 
     const note = s.specSource
-      ? `Cabinet specs from the ${s.specSource}. Rigging loads are a planning estimate, not a structural sign-off.`
-      : "Cabinet specs have not been checked against the manufacturer datasheet. Rigging loads are a planning estimate, not a structural sign-off.";
+      ? `Cabinet specs from the ${s.specSource}. Rigging loads are a planning estimate, not a structural sign-off. Please consult a qualified rigger before using these calculations.`
+      : "Cabinet specs have not been checked against the manufacturer datasheet. Rigging loads are a planning estimate, not a structural sign-off. Please consult a qualified rigger before using these calculations.";
     const lines: string[] = doc.splitTextToSize(note, CW);
     lines.forEach((line) => {
       ensure(5);

@@ -23,6 +23,10 @@ export default function RiggingPlanner({
 
   return (
     <div className="space-y-4">
+          <Notice kind="warn">
+            <strong>Please consult a qualified rigger before using these calculations.</strong> Weights, loads per point and ballast figures are planning estimates only. They are not a structural sign-off, and they don&apos;t replace the manufacturer&apos;s rigging instructions or a rigger&apos;s or engineer&apos;s assessment of the actual rig and venue.
+          </Notice>
+
           <div className="panel">
             <h2 className="panel-title">Weight and rigging</h2>
 
