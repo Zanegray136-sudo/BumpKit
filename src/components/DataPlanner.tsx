@@ -4,7 +4,7 @@ import CabinetMap, { colourFor } from "./CabinetMap";
 import { dataCells } from "../utils/mapCells";
 import GroupPainter from "./GroupPainter";
 import PortList from "./PortList";
-import { useState } from "react";
+import { useMapStyle } from "../utils/useMapStyle";
 import type { Pos } from "../utils/wall";
 import { GroupChip, LoadBar, ModeSwitch, ModeSwitchGeneric, Notice, Select, SettingsGroup, Stat, Toggle } from "./ui";
 import { getPortRanges } from "../utils/cabinetLabels";
@@ -48,21 +48,7 @@ export default function DataPlanner({
   processorPorts,
 }: Props) {
   const custom = customChains !== null;
-  const [variant, setVariant] = useState<"card" | "solid">(() => {
-    try {
-      return localStorage.getItem("open-av-toolkit.map-style") === "solid" ? "solid" : "card";
-    } catch {
-      return "card";
-    }
-  });
-  const pickVariant = (v: "card" | "solid") => {
-    setVariant(v);
-    try {
-      localStorage.setItem("open-av-toolkit.map-style", v);
-    } catch {
-      /* not saved */
-    }
-  };
+  const [variant, pickVariant] = useMapStyle();
   const portInfo = (i: number) => {
     const p = plan.ports[i];
     return p ? { detail: `${(p.pixels / 1000).toFixed(0)}k px`, pct: p.loadPct, over: p.over } : {};

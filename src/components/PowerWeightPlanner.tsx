@@ -2,9 +2,11 @@ import { useMemo } from "react";
 import CabinetMap, { colourFor } from "./CabinetMap";
 import { powerCells } from "../utils/mapCells";
 import GroupPainter from "./GroupPainter";
+import PortList from "./PortList";
+import { useMapStyle } from "../utils/useMapStyle";
 import type { Scale } from "../utils/sizes";
 import type { Pos } from "../utils/wall";
-import { GroupChip, GroupLegend, LoadBar, ModeSwitch, Notice, NumberField, Select, SettingsGroup, Stat } from "./ui";
+import { GroupChip, LoadBar, ModeSwitch, ModeSwitchGeneric, Notice, NumberField, Select, SettingsGroup, Stat } from "./ui";
 import { multicoreNames, type PowerPlan, type PowerSettings } from "../utils/powerPlan";
 
 type Props = {
@@ -51,6 +53,14 @@ export default function PowerWeightPlanner({
     () => (plan ? powerCells(plan, wide, numberingMode, three, removed, scale) : []),
     [plan, wide, numberingMode, three, removed, scale]
   );
+
+  const [variant, pickVariant] = useMapStyle();
+  const circuitInfo = (i: number) => {
+    const c = plan?.circuits[i];
+    return c
+      ? { detail: `${c.amps.toFixed(1)} A${c.phase && c.phase !== "-" ? ` · ${c.phase}` : ""}`, pct: c.loadPct, over: c.loadPct > 100.0001 }
+      : {};
+  };
 
   return (
     <div className="space-y-4">
@@ -248,15 +258,18 @@ export default function PowerWeightPlanner({
           </div>
 
           <div className="panel">
-            <h2 className="panel-title">Power map</h2>
-            <GroupLegend
-              items={plan.circuits.map((c) => ({
-                key: c.number,
-                colour: colourFor(c.number),
-                label: `C${String(c.number).padStart(2, "0")}`,
-                detail: `${c.amps.toFixed(1)}A`,
-              }))}
-            />
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="panel-title !mb-0">Power map</h2>
+              <ModeSwitchGeneric
+                label="Map style"
+                value={variant}
+                onChange={(v) => pickVariant(v as "card" | "solid")}
+                options={[
+                  { value: "card", label: "Cards" },
+                  { value: "solid", label: "Solid tiles" },
+                ]}
+              />
+            </div>
             {custom ? (
               <GroupPainter
                 prefix="C"
@@ -268,9 +281,22 @@ export default function PowerWeightPlanner({
                   setCustomCircuits(plan.suggestedCircuits.map((x) => [...x]))
                 }
                 cells={cells}
+                variant={variant}
+                info={circuitInfo}
+                unassigned={plan.unassigned}
               />
             ) : (
-              <CabinetMap cells={cells} />
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+                <CabinetMap cells={cells} variant={variant} />
+                <PortList
+                  items={plan.circuits.map((c, i) => ({
+                    colour: colourFor(c.number),
+                    name: `C${String(c.number).padStart(2, "0")}`,
+                    count: c.cabinets,
+                    ...circuitInfo(i),
+                  }))}
+                />
+              </div>
             )}
           </div>
 
