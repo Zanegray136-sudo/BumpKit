@@ -1,3 +1,5 @@
+import LogoField from "./LogoField";
+
 type Props = {
   projectName: string;
   setProjectName: (value: string) => void;
@@ -73,6 +75,8 @@ export default function ProjectDetails({
             onChange={(e) => setRevision(e.target.value)}
           />
         </div>
+
+        <LogoField />
 
         <textarea
           className="input min-h-24 resize-y"

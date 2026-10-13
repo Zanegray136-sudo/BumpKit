@@ -1,5 +1,6 @@
 import type { MapCell } from "../components/CabinetMap";
 import { colourFor } from "../components/CabinetMap";
+import type { Logo } from "./logo";
 import { fmtM } from "./units";
 import { buildRunPaths, headPoints, pathData } from "./runPath";
 
@@ -13,6 +14,8 @@ export type WallDrawing = {
   widthLabel: string;
   heightLabel: string;
   /** Draw a 1.75 m person and the floor beside the wall */
+  /** Company logo, drawn top right */
+  logo?: Logo | null;
   figure?: { cabinetHeightM: number; floorGapM: number; wallHeightM: number };
 };
 
@@ -37,7 +40,7 @@ export function wallToSvg(d: WallDrawing): string {
   const gapPx = fig ? Math.max(0, fig.floorGapM) * pxPerM : 0;
   const floorY = top + gridH + gapPx;
   const figW = fig ? Math.max(70, personPx * 0.34) + 70 : 0;
-  const width = left + colX[cols] + 20 + (fig ? figW : 0);
+  const width = Math.max(left + colX[cols] + 20 + (fig ? figW : 0), d.logo ? 380 : 0);
   const height = Math.max(top + rowY[rows] + 20, fig ? floorY + 30 : 0, fig ? floorY - personPx + 30 : 0);
 
   const parts: string[] = [
@@ -55,6 +58,18 @@ export function wallToSvg(d: WallDrawing): string {
     `<line x1="${left - 20}" y1="${top + gridH}" x2="${left - 8}" y2="${top + gridH}" stroke="#6b757d"/>`,
     `<text transform="translate(${left - 22} ${top + gridH / 2}) rotate(-90)" fill="#b4bcc2" font-size="12" text-anchor="middle">${esc(d.heightLabel)}</text>`,
   ];
+
+  if (d.logo) {
+    const boxH = 50;
+    const k = Math.min((boxH - 10) / d.logo.height, 140 / d.logo.width);
+    const lw = d.logo.width * k;
+    const lh = d.logo.height * k;
+    const bx = width - 20 - (lw + 10);
+    parts.push(
+      `<rect x="${bx}" y="10" width="${lw + 10}" height="${boxH}" rx="6" fill="#ffffff"/>`,
+      `<image href="${d.logo.dataUrl}" x="${bx + 5}" y="${10 + (boxH - lh) / 2}" width="${lw}" height="${lh}"/>`
+    );
+  }
 
   d.cells.forEach((row, r) =>
     row.forEach((cell, c) => {

@@ -134,6 +134,7 @@ export type ReportOptions = {
   mapStyle?: "card" | "solid";
 };
 
+import { getLogo } from "./logo";
 import { reportChecks, reportChecksAll, type Check } from "./checks";
 export { reportChecks, reportChecksAll };
 export type { Check };
@@ -460,6 +461,25 @@ export function buildReport(d: ReportData, o: ReportOptions): jsPDF {
   doc.setFillColor(...ACCENT);
   doc.rect(0, 40, W, 1.2, "F");
 
+  const logo = getLogo();
+  if (logo) {
+    // On a white tile so any logo colour stays readable on the dark band.
+    const boxH = 17;
+    const maxW = 52;
+    const k = Math.min((boxH - 4) / logo.height, (maxW - 4) / logo.width);
+    const lw = logo.width * k;
+    const lh = logo.height * k;
+    const bx = W - M - (lw + 4);
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(bx, 5, lw + 4, boxH, 1.5, 1.5, "F");
+    try {
+      doc.addImage(logo.dataUrl, "PNG", bx + 2, 5 + (boxH - lh) / 2, lw, lh, undefined, "FAST");
+    } catch {
+      /* skip a logo jsPDF can't embed */
+    }
+  }
+  const rightY = logo ? { rev: 28, date: 33, eng: 38 } : { rev: 15, date: 21, eng: 27 };
+
   text("ENGINEERING REPORT", M, 15, 8.5, "bold", [150, 175, 210]);
   text(d.project.name || "Untitled project", M, 27, 20, "bold", [255, 255, 255]);
   text(
@@ -470,14 +490,14 @@ export function buildReport(d: ReportData, o: ReportOptions): jsPDF {
     "normal",
     [190, 198, 205]
   );
-  text(d.project.revision || "Rev A", W - M, 15, 9, "bold", [255, 255, 255], "right");
+  text(d.project.revision || "Rev A", W - M, rightY.rev, 9, "bold", [255, 255, 255], "right");
   if (d.project.engineer) {
-    text(`Engineer: ${d.project.engineer}`, W - M, 27, 9, "normal", [190, 198, 205], "right");
+    text(`Engineer: ${d.project.engineer}`, W - M, rightY.eng, 9, "normal", [190, 198, 205], "right");
   }
   text(
     new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }),
     W - M,
-    21,
+    rightY.date,
     9,
     "normal",
     [190, 198, 205],

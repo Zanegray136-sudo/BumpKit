@@ -4,6 +4,7 @@ import CabinetMap, { cellSize } from "./CabinetMap";
 import { ModeSwitchGeneric, Stat } from "./ui";
 import { dataCells, namesCells, powerCells } from "../utils/mapCells";
 import { downloadPng, downloadSvg } from "../utils/exportWall";
+import { getLogo } from "../utils/logo";
 import type { Scale } from "../utils/sizes";
 import type { DataPlan } from "../utils/dataPlan";
 import type { PowerPlan } from "../utils/powerPlan";
@@ -78,6 +79,7 @@ export default function WallDesigner(p: Props) {
     }`,
     widthLabel: `${fmtM(p.widthMetres)}  (${p.resWidth} px)`,
     heightLabel: `${fmtM(p.heightMetres)}  (${p.resHeight} px)`,
+    logo: getLogo(),
     figure:
       figure && p.hasPanel && p.cabinetHeightMm > 0
         ? { cabinetHeightM: p.cabinetHeightMm / 1000, floorGapM: Math.max(0, fromInputLen(Number(floorGap) || 0)), wallHeightM: p.heightMetres }
