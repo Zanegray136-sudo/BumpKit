@@ -10,6 +10,7 @@ import {
 import { buildCabinetCsv, buildPortCsv } from "../utils/cabinetCsv";
 import { processorSheetText } from "../utils/processorSheet";
 import { Select } from "./ui";
+import ShowChecklist from "./ShowChecklist";
 import { useMapStyle } from "../utils/useMapStyle";
 
 const dot = {
@@ -261,6 +262,7 @@ export default function EngineeringReport({ data }: { data: ReportData }) {
             One row per cabinet with its pixel position, data port and circuit, or one row per data port. Covers every screen in the project.
           </p>
         </div>
+        <ShowChecklist data={data} />
       </div>
 
       <div

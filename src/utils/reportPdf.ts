@@ -1,3 +1,4 @@
+import { buildShowChecklist } from "./showChecklist";
 import { calcBallast } from "./ballast";
 import type { DistroPlan, DistroSettings } from "./distro";
 import type { Scale } from "./sizes";
@@ -118,6 +119,7 @@ export const reportSections = [
   { group: "Whole project", id: "distro", label: "Power distro" },
   { group: "Whole project", id: "cables", label: "Cable schedule" },
   { group: "Whole project", id: "pickList", label: "Pick list" },
+  { group: "Whole project", id: "showChecklist", label: "Show-day checklist" },
 ] as const;
 
 export type ReportSectionId = (typeof reportSections)[number]["id"];
@@ -267,7 +269,7 @@ export function buildReport(d: ReportData, o: ReportOptions): jsPDF {
         x += widths[i];
       });
 
-      if (opts.checkbox) {
+      if (opts.checkbox && row[0] === "") {
         doc.setDrawColor(...MUTED);
         doc.setLineWidth(0.3);
         doc.rect(M + 2, y + (rowH - 3.6) / 2, 3.6, 3.6, "S");
@@ -1134,6 +1136,32 @@ export function buildReport(d: ReportData, o: ReportOptions): jsPDF {
         ...(priced
           ? [{ header: "Price", width: 16, align: "right" as const }, { header: "Line total", width: 20, align: "right" as const }]
           : []),
+      ],
+      rows,
+      { checkbox: true, rowH: 6.8 }
+    );
+  }
+
+  // =========================================================================
+  // Show-day checklist
+  // =========================================================================
+  if (sec("showChecklist") && d.screen && d.screen.cabinets > 0) {
+    newPage();
+    heading("Show-day checklist");
+    const rows: Row[] = [];
+    buildShowChecklist(d).forEach((g) => {
+      rows.push({ group: g.title });
+      g.items.forEach((i) => {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8.5);
+        const lines: string[] = doc.splitTextToSize(i.text, CW - 14);
+        lines.forEach((line, n) => rows.push([n === 0 ? "" : " ", line]));
+      });
+    });
+    table(
+      [
+        { header: "", width: 8 },
+        { header: "Task", width: 170 },
       ],
       rows,
       { checkbox: true, rowH: 6.8 }
