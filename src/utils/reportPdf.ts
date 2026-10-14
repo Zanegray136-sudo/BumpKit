@@ -17,6 +17,8 @@ import type { PickItem } from "./pickList";
 import { multicoreNames, type PowerPlan, type PowerSettings } from "./powerPlan";
 
 export type ReportData = {
+  /** What changed since the last saved revision */
+  changes?: { since: string; items: { screen: string; what: string; before: string; after: string }[] } | null;
   project: {
     name: string;
     client: string;
@@ -105,6 +107,7 @@ export const reportSections = [
   { group: "Overview", id: "screenDetails", label: "Screen details" },
   { group: "Overview", id: "processorDetails", label: "Processor details" },
   { group: "Overview", id: "notes", label: "Project notes" },
+  { group: "Overview", id: "changes", label: "Changes since the last saved revision" },
   { group: "Data", id: "dataMap", label: "Data map" },
   { group: "Data", id: "patchSheet", label: "Patch sheet" },
   { group: "Canvas", id: "canvasPattern", label: "Pixel canvas test pattern" },
@@ -619,6 +622,23 @@ export function buildReport(d: ReportData, o: ReportOptions): jsPDF {
       text(line, M, y, 9.5);
       y += 5;
     });
+    y += 4;
+  }
+
+  if (index === 0 && sec("changes") && d.changes && d.changes.items.length > 0) {
+    heading(`Changes since ${d.changes.since}`);
+    d.changes.items.slice(0, 60).forEach((c) => {
+      ensure(6);
+      text(`${c.screen}: ${c.what}`, M, y, 9.5);
+      const right = `${c.before}  >  ${c.after}`;
+      text(right, M + CW, y, 9.5, "normal", MUTED, "right");
+      y += 5;
+    });
+    if (d.changes.items.length > 60) {
+      ensure(6);
+      text(`and ${d.changes.items.length - 60} more`, M, y, 8.5, "normal", MUTED);
+      y += 5;
+    }
     y += 4;
   }
 

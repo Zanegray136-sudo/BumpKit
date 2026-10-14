@@ -66,6 +66,8 @@ import type { ReportData } from "./utils/reportPdf";
 import { useInstall } from "./utils/useInstall";
 import { reportChecksAll } from "./utils/checks";
 import ProjectSummary from "./components/ProjectSummary";
+import RevisionHistory from "./components/RevisionHistory";
+import { compareRevisions, useRevisions, type ScreenFigures } from "./utils/revisions";
 import ChecksMenu from "./components/ChecksMenu";
 import CommandPalette, { type Command } from "./components/CommandPalette";
 
@@ -462,12 +464,34 @@ function App() {
       />
     );
 
+  const figures: ScreenFigures[] = screens.map((x, i) => ({
+    id: x.id,
+    name: x.name,
+    panel: all[i].selectedPanel ? `${all[i].selectedPanel!.manufacturer} ${all[i].selectedPanel!.model}` : "",
+    processor: x.processor,
+    cabinets: all[i].cabinetCount,
+    resWidth: all[i].resWidth,
+    resHeight: all[i].resHeight,
+    widthMetres: all[i].widthMetres,
+    heightMetres: all[i].heightMetres,
+    ports: all[i].dataPlan ? all[i].dataPlan.ports.length : 0,
+    circuits: all[i].powerPlan ? all[i].powerPlan.circuits.length : 0,
+    watts: all[i].totalPower,
+    kg: all[i].totalWeight,
+    loadPct: Number(all[i].processorLoading) || 0,
+  }));
+
+  const savedRevisions = useRevisions();
+  const lastSaved = savedRevisions[0];
+  const changeList = lastSaved ? compareRevisions(lastSaved.screens, figures) : [];
+  const changesKey = lastSaved ? `${lastSaved.id}|${JSON.stringify(changeList)}` : "";
+
   const reportData = useMemo<ReportData | null>(() => {
     if (page !== "report") return null;
     const list = screens.map((x, i) => buildScreenReport(x, all[i], ctx, pickLists[i]));
-    return { ...list[0], pickList: pickItems, cables: cableRows, pricing: { currency: pickSettings.currency, days: pickSettings.days }, extraScreens: list.slice(1), distro: distroPlan ? { plan: distroPlan, settings: distro } : null };
+    return { ...list[0], pickList: pickItems, cables: cableRows, pricing: { currency: pickSettings.currency, days: pickSettings.days }, extraScreens: list.slice(1), distro: distroPlan ? { plan: distroPlan, settings: distro } : null, changes: lastSaved ? { since: lastSaved.label, items: changeList } : null };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, screens, revision, projectName, client, venue, engineer, notes, pickLists, pickItems, units, cableRows, pickSettings.currency, pickSettings.days, distroPlan, distro]);
+  }, [page, screens, revision, projectName, client, venue, engineer, notes, pickLists, pickItems, units, cableRows, pickSettings.currency, pickSettings.days, distroPlan, distro, changesKey]);
 
   const install = useInstall();
 
@@ -599,6 +623,7 @@ function App() {
           notes={notes}
           setNotes={setNotes}
         />
+        <RevisionHistory revision={revision} figures={figures} />
         <TemplatePicker
           onPick={(t) => {
             if (!window.confirm(`Replace this project's screens with "${t.name}"?`)) return;
