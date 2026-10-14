@@ -807,11 +807,7 @@ function App() {
                   }
                 />
                 <CurveSetup curve={curve} setCurve={setCurve} plan={curvePlan} panelChosen={!!selectedPanel} />
-                <ViewingDistance
-                  plan={selectedPanel ? calcViewing(selectedPanel.pitch, heightMetres) : null}
-                  pitch={selectedPanel?.pitch ?? 0}
-                  panels={allPanels}
-                />
+                <ViewingDistance plan={selectedPanel ? calcViewing(selectedPanel.pitch, heightMetres) : null} />
               </div>
               <div className="lg:col-span-2">
                 <ProcessorAnalysis

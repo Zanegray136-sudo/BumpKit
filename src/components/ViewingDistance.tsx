@@ -1,31 +1,7 @@
-import { useState } from "react";
-import { judgePitch, pitchForDistance, suggestPanels, type ViewingPlan } from "../utils/viewing";
+import type { ViewingPlan } from "../utils/viewing";
 import { fmtM } from "../utils/units";
-import { NumberField } from "./ui";
 
-type PanelLite = { manufacturer: string; model: string; pitch: number };
-
-const VERDICT = {
-  "too-coarse": { text: "Too coarse for the nearest seat. People will see single pixels.", cls: "text-red-300" },
-  good: { text: "Good for the nearest seat.", cls: "text-emerald-300" },
-  seamless: { text: "Finer than needed. The nearest seat can't see pixels, so a coarser cabinet would do.", cls: "text-amber-300" },
-} as const;
-
-export default function ViewingDistance({
-  plan,
-  pitch = 0,
-  panels = [],
-}: {
-  plan: ViewingPlan | null;
-  /** Pitch of the chosen cabinet, mm */
-  pitch?: number;
-  panels?: PanelLite[];
-}) {
-  const [nearest, setNearest] = useState(0);
-  const advice = pitchForDistance(nearest);
-  const verdict = judgePitch(pitch, nearest);
-  const picks = suggestPanels(panels, nearest);
-
+export default function ViewingDistance({ plan }: { plan: ViewingPlan | null }) {
   return (
     <div className="panel">
       <h2 className="panel-title">Viewing distance</h2>
@@ -49,38 +25,10 @@ export default function ViewingDistance({
           <p className="mt-3 text-xs text-zinc-500">
             Rules of thumb for planning the audience area. Content type, brightness and the room change them.
           </p>
-
         </>
       ) : (
         <p className="text-sm text-zinc-500">Choose a panel to see how close and how far people can sit.</p>
       )}
-
-        <div className="mt-4 border-t border-zinc-800 pt-4">
-          <div className="max-w-xs">
-            <NumberField label="Nearest seat or viewer (m)" value={nearest} min={0} step={0.5} onChange={setNearest} />
-          </div>
-          {advice && (
-            <div className="mt-3 space-y-2 text-sm">
-              <p className="text-zinc-300">
-                From {nearest} m, pitch up to <strong className="text-zinc-50">{advice.comfortableMm.toFixed(1)} mm</strong> looks
-                good, and up to {advice.seamlessMm.toFixed(1)} mm hides single pixels completely.
-              </p>
-              {verdict && <p className={VERDICT[verdict].cls}>{VERDICT[verdict].text}</p>}
-              {picks.length > 0 && (
-                <div>
-                  <div className="text-xs text-zinc-500">Cabinets that suit, coarsest first</div>
-                  <ul className="mt-1 space-y-0.5 text-zinc-300">
-                    {picks.map((p) => (
-                      <li key={`${p.manufacturer}${p.model}`}>
-                        {p.manufacturer} {p.model} <span className="text-zinc-500">· {p.pitch} mm</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
     </div>
   );
 }
