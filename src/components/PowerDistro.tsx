@@ -50,7 +50,7 @@ export default function PowerDistro({ plan, settings: s, setSettings }: Props) {
             </Notice>
           ))}
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Stat label="Circuits" value={plan.rows.length} sub={`${plan.units.length} distro${plan.units.length === 1 ? "" : "s"}`} />
             <Stat label="Total load" value={`${plan.totalKva.toFixed(1)} kVA`} sub={`${(plan.totalWatts / 1000).toFixed(1)} kW`} />
             <Stat label="Generator" value={`${plan.generatorKva} kVA`} sub={`${s.generatorMargin}% spare`} />

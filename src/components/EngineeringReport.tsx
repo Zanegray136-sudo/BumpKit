@@ -43,6 +43,14 @@ export default function EngineeringReport({ data }: { data: ReportData }) {
   const [sections, setSections] = useState<Partial<Record<ReportSectionId, boolean>>>(saved.sections);
   const [excluded, setExcluded] = useState<string[]>([]);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  // Phones and tablets rarely show a PDF inside a page, so offer buttons there instead.
+  const [touch] = useState(() => {
+    try {
+      return window.matchMedia("(pointer: coarse)").matches;
+    } catch {
+      return false;
+    }
+  });
   const [error, setError] = useState("");
 
   const isOn = (id: ReportSectionId) => sections[id] !== false;
@@ -255,7 +263,11 @@ export default function EngineeringReport({ data }: { data: ReportData }) {
         </div>
       </div>
 
-      <div className="panel !p-0 overflow-hidden min-h-[70vh] flex flex-col xl:row-span-2 xl:col-start-2 xl:row-start-1">
+      <div
+        className={`panel !p-0 overflow-hidden flex flex-col xl:row-span-2 xl:col-start-2 xl:row-start-1 ${
+          touch ? "" : "min-h-[70vh]"
+        }`}
+      >
         <div className="px-4 py-3 border-b border-zinc-800 text-sm text-zinc-400">
           Preview
         </div>
@@ -263,6 +275,20 @@ export default function EngineeringReport({ data }: { data: ReportData }) {
           <p className="p-4 text-sm text-red-300" role="alert">
             {error}
           </p>
+        ) : previewUrl && touch ? (
+          <div className="p-4 space-y-3">
+            <p className="text-sm text-zinc-300">
+              Your report is ready. Phones can&apos;t show the PDF on this page, so open it in your PDF viewer or save it.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <a href={previewUrl} target="_blank" rel="noreferrer" className="btn-primary">
+                Open PDF
+              </a>
+              <button type="button" className="btn" onClick={download} disabled={!data.screen}>
+                Download PDF
+              </button>
+            </div>
+          </div>
         ) : previewUrl ? (
           <iframe
             title="Engineering report preview"
@@ -272,7 +298,7 @@ export default function EngineeringReport({ data }: { data: ReportData }) {
         ) : (
           <p className="p-4 text-sm text-zinc-400">Building the report...</p>
         )}
-        <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-zinc-800">
+        <div className={`items-center justify-between gap-3 px-4 py-3 border-t border-zinc-800 ${touch ? "hidden" : "flex"}`}>
           <p className="text-xs text-zinc-500">
             If the preview doesn&apos;t show in your browser, use Download PDF.
           </p>

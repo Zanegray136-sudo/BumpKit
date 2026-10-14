@@ -95,7 +95,7 @@ export default function RiggingPlanner({
               </div>
             )}
 
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
               <Stat label="Cabinets" value={fmtKg(plan.cabinetsKg, 1)} />
               <Stat
                 label="Total with rigging"
@@ -133,7 +133,7 @@ export default function RiggingPlanner({
               </div>
               {ballast && (
                 <>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
                     <Stat
                       label="Suggested ballast"
                       value={ballast.ballastKg > 0 ? fmtKg(ballast.ballastKg) : "None needed"}

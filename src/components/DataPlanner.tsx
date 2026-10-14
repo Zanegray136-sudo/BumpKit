@@ -177,7 +177,7 @@ export default function DataPlanner({
         )}
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Ports used" value={`${portsNeeded}${processorPorts > 0 ? ` / ${processorPorts}` : ""}`} sub={processorName || undefined} />
         <Stat label="Cabinets" value={plan.ports.reduce((n, p) => n + p.cabinets, 0)} sub={`up to ${plan.maxPerPort} per port`} />
         <Stat

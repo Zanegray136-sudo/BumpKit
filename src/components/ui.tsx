@@ -157,7 +157,7 @@ export function Stat({
   sub?: string;
 }) {
   return (
-    <div className="rounded-md border border-zinc-800 bg-zinc-950 p-3">
+    <div className="min-w-0 break-words rounded-md border border-zinc-800 bg-zinc-950 p-3">
       <div className="text-xs text-zinc-400">{label}</div>
       <div className="text-lg font-semibold mt-0.5 text-zinc-50">{value}</div>
       {sub && <div className="text-xs text-zinc-500 mt-0.5">{sub}</div>}

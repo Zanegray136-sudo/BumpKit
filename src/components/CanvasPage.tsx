@@ -119,7 +119,7 @@ export default function CanvasPage({
           Printed on the test pattern, downloads and the report. Leave blank to use the project name.
         </p>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <Stat label="Canvas" value={`${canvas.width} x ${canvas.height}`} />
         <Stat label="Aspect" value={aspect.toFixed(3)} />
         <Stat label="Lit pixels" value={canvas.litPixels.toLocaleString()} />
