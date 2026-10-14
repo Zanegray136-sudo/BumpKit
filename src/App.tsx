@@ -78,6 +78,7 @@ const WallDesigner = lazy(() => import("./components/WallDesigner"));
 const CanvasPage = lazy(() => import("./components/CanvasPage"));
 
 function App() {
+  const [menuOpen, setMenuOpen] = useState(false);
   const [page, setPage] = useState<PageId>(() =>
     pageFromHash(window.location.hash)
   );
@@ -286,6 +287,13 @@ function App() {
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMenuOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menuOpen]);
 
   const goTo = (id: PageId) => {
     window.location.hash = `/${id}`;
@@ -893,10 +901,32 @@ function App() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex">
-      <div className="w-56 shrink-0 sticky top-0 h-screen self-start">
+      <div className="hidden lg:block w-56 shrink-0 sticky top-0 h-screen self-start">
         <Sidebar current={page} onSelect={goTo} done={done} issues={issues} onInstall={install ?? undefined} />
-        <CommandPalette commands={commands} />
       </div>
+      {menuOpen && (
+        <div className="lg:hidden fixed inset-0 z-40" role="dialog" aria-modal="true" aria-label="Pages">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/60"
+            aria-label="Close the page menu"
+            onClick={() => setMenuOpen(false)}
+          />
+          <div className="absolute left-0 top-0 h-full w-64 max-w-[80vw] shadow-2xl">
+            <Sidebar
+              current={page}
+              onSelect={(id) => {
+                setMenuOpen(false);
+                goTo(id);
+              }}
+              done={done}
+              issues={issues}
+              onInstall={install ?? undefined}
+            />
+          </div>
+        </div>
+      )}
+      <CommandPalette commands={commands} />
 
       <div className="flex-1 min-w-0">
         <TopBar
@@ -918,9 +948,10 @@ function App() {
           }
           overloaded={overloaded}
           extra={<ChecksMenu checks={checks} />}
+          onMenu={() => setMenuOpen(true)}
         />
 
-        <main className="p-6 max-w-[1400px]">
+        <main className="p-4 sm:p-6 max-w-[1400px]">
           <ProjectToolbar
             canUndo={history.canUndo}
             canRedo={history.canRedo}

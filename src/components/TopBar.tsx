@@ -17,11 +17,13 @@ type Props = {
   overloaded: boolean;
   /** Extra control at the right end, e.g. the checks menu */
   extra?: ReactNode;
+  /** Opens the page menu on narrow screens */
+  onMenu?: () => void;
 };
 
-function Readout({ label, value }: { label: string; value: string }) {
+function Readout({ label, value, className = "" }: { label: string; value: string; className?: string }) {
   return (
-    <div className="min-w-0">
+    <div className={`min-w-0 ${className}`}>
       <div className="text-xs text-zinc-500">{label}</div>
       <div className="text-sm font-medium text-zinc-50 whitespace-nowrap">
         {value}
@@ -41,7 +43,18 @@ export default function TopBar(p: Props) {
 
   return (
     <header className="sticky top-0 z-20 bg-zinc-950/95 backdrop-blur border-b border-zinc-800">
-      <div className="h-14 px-6 flex items-center gap-x-8 gap-y-2 flex-wrap">
+      <div className="min-h-14 px-4 sm:px-6 py-2 flex items-center gap-x-4 sm:gap-x-8 gap-y-2 flex-wrap">
+        {p.onMenu && (
+          <button
+            type="button"
+            className="btn lg:hidden"
+            style={{ padding: "6px 10px" }}
+            onClick={p.onMenu}
+            aria-label="Open the page menu"
+          >
+            <span aria-hidden="true">☰</span> Menu
+          </button>
+        )}
         <div className="min-w-0 mr-auto">
           <div className="text-sm font-semibold text-zinc-50 truncate">
             {p.projectName || "Untitled project"}
@@ -55,6 +68,7 @@ export default function TopBar(p: Props) {
           value={hasScreen ? `${p.resWidth} × ${p.resHeight}` : "-"}
         />
         <Readout
+          className="hidden md:block"
           label="Size"
           value={
             hasScreen
@@ -64,15 +78,17 @@ export default function TopBar(p: Props) {
         />
         <Readout label="Cabinets" value={hasScreen ? String(p.cabinets) : "-"} />
         <Readout
+          className="hidden lg:block"
           label="Power"
           value={hasScreen ? `${p.totalKw.toFixed(2)} kW` : "-"}
         />
         <Readout
+          className="hidden lg:block"
           label="Weight"
           value={hasScreen ? fmtKg(p.totalKg) : "-"}
         />
 
-        <div className="w-40">
+        <div className="w-32 sm:w-40">
           <div className="flex justify-between text-xs text-zinc-500 mb-1">
             <span>{p.processor || "No processor"}</span>
             <span className={p.overloaded ? "text-red-400" : "text-zinc-300"}>
