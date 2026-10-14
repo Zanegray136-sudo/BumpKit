@@ -176,3 +176,36 @@
   .data-table tbody tr:hover td { background: rgba(255,255,255,0.025); }
   .data-table tbody tr:last-child td { border-bottom: none; }
 }
+
+/* Touch screens: bigger tap targets, and 16px text in fields so phones don't zoom in on focus. */
+html {
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  -webkit-tap-highlight-color: transparent;
+}
+@media (pointer: coarse) {
+  button,
+  select,
+  .btn,
+  .btn-primary,
+  [role="radio"] {
+    min-height: 40px;
+    touch-action: manipulation;
+  }
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+    min-height: 40px;
+  }
+  input[type="checkbox"],
+  input[type="radio"] {
+    width: 20px;
+    height: 20px;
+  }
+  label:has(> input[type="checkbox"]),
+  label:has(> input[type="radio"]) {
+    min-height: 36px;
+  }
+}

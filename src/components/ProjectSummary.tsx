@@ -38,7 +38,7 @@ export default function ProjectSummary({
   return (
     <div className="panel">
       <h2 className="panel-title">Project at a glance</h2>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-5">
         <Stat label="Screens" value={live.length} />
         <Stat label="Cabinets" value={sum((r) => r.cabinets)} />
         <Stat label="Power" value={`${kva.toFixed(2)} kW`} />

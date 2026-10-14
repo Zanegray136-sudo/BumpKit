@@ -79,7 +79,7 @@ export default function Sidebar({ current, onSelect, done, issues = {}, onInstal
           </button>
         </div>
       )}
-      <p className="px-4 pb-4 text-[11px] text-zinc-600">
+      <p className="px-4 pb-4 text-[11px] text-zinc-600 [@media(pointer:coarse)]:hidden">
         Press <kbd className="rounded border border-zinc-700 px-1 text-zinc-400">Ctrl</kbd>{" "}
         <kbd className="rounded border border-zinc-700 px-1 text-zinc-400">K</kbd> to jump anywhere
       </p>

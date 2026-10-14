@@ -60,10 +60,20 @@ export default function TopBar(p: Props) {
             {p.projectName || "Untitled project"}
             {p.screenName && <span className="font-normal text-zinc-400"> / {p.screenName}</span>}
           </div>
-          <div className="text-xs text-zinc-500">{p.revision || "No revision"}</div>
+          <div className="text-xs text-zinc-500 truncate">
+            {p.revision || "No revision"}
+            {hasScreen && (
+              <span className="sm:hidden">
+                {" "}
+                · {p.resWidth} × {p.resHeight} · {p.cabinets} cab
+                {p.loadPct !== null ? ` · ${load.toFixed(0)}%` : ""}
+              </span>
+            )}
+          </div>
         </div>
 
         <Readout
+          className="hidden sm:block"
           label="Resolution"
           value={hasScreen ? `${p.resWidth} × ${p.resHeight}` : "-"}
         />
@@ -76,7 +86,7 @@ export default function TopBar(p: Props) {
               : "-"
           }
         />
-        <Readout label="Cabinets" value={hasScreen ? String(p.cabinets) : "-"} />
+        <Readout className="hidden sm:block" label="Cabinets" value={hasScreen ? String(p.cabinets) : "-"} />
         <Readout
           className="hidden lg:block"
           label="Power"
@@ -88,7 +98,7 @@ export default function TopBar(p: Props) {
           value={hasScreen ? fmtKg(p.totalKg) : "-"}
         />
 
-        <div className="w-32 sm:w-40">
+        <div className="hidden sm:block w-40">
           <div className="flex justify-between text-xs text-zinc-500 mb-1">
             <span>{p.processor || "No processor"}</span>
             <span className={p.overloaded ? "text-red-400" : "text-zinc-300"}>

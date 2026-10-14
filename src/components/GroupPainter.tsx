@@ -42,6 +42,11 @@ export default function GroupPainter({
   const [brush, setBrush] = useState<Brush>("cabinet");
   const [history, setHistory] = useState<Pos[][][]>([]);
   const [lineDir, setLineDir] = useState<LineDir>("auto");
+  // On a touch screen the map scrolls with the page until drawing is switched on,
+  // so a swipe to scroll never paints cabinets by accident.
+  const touch = typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)").matches;
+  const [drawMode, setDrawMode] = useState(false);
+  const canPaint = !touch || drawMode;
   const lastLine = useRef(-1);
 
   // Latest groups while a drag is in progress.
@@ -110,6 +115,17 @@ export default function GroupPainter({
   return (
     <div className="grid gap-4 grid-cols-[minmax(0,1fr)] xl:grid-cols-[minmax(0,1fr)_300px]">
     <div className="space-y-3 min-w-0">
+      {touch && (
+        <button
+          type="button"
+          className={`w-full ${drawMode ? "btn-primary" : "btn"}`}
+          aria-pressed={drawMode}
+          onClick={() => setDrawMode(!drawMode)}
+        >
+          {drawMode ? "Drawing is on. Tap here to scroll the page again" : "Scrolling. Tap here to start drawing"}
+        </button>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         <div
           role="radiogroup"
@@ -239,7 +255,7 @@ export default function GroupPainter({
 
       <CabinetMap
         cells={cells}
-        onPaint={paint}
+        onPaint={canPaint ? paint : undefined}
         cursor={tool === "erase" ? "cell" : "crosshair"}
         variant={variant}
       />

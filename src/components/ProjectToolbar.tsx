@@ -32,7 +32,7 @@ export default function ProjectToolbar({
   const small = { padding: "4px 10px", fontSize: 12 } as const;
 
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-2">
+    <div className="mb-4 -mx-4 px-4 sm:mx-0 sm:px-0 flex flex-nowrap overflow-x-auto sm:flex-wrap sm:overflow-visible items-center gap-2 pb-1 sm:pb-0 [&>*]:shrink-0">
       <button type="button" className="btn" style={small} onClick={onUndo} disabled={!canUndo} title="Undo (Ctrl/Cmd+Z)">
         Undo
       </button>
@@ -75,7 +75,7 @@ export default function ProjectToolbar({
           { value: "imperial", label: "Imperial" },
         ]}
       />
-      <span className="ml-auto text-xs text-zinc-500" role="status">
+      <span className="ml-auto pl-2 text-xs text-zinc-500 whitespace-nowrap" role="status">
         {status}
       </span>
     </div>

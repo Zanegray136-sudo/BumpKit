@@ -448,6 +448,7 @@ function App() {
 
   const current = pages.find((p) => p.id === page) ?? pages[0];
   const nextPage = pages[pages.findIndex((p) => p.id === page) + 1];
+  const prevPage = pages[pages.findIndex((p) => p.id === page) - 1];
 
   const needsPanel = (content: React.ReactNode) =>
     selectedPanel ? (
@@ -928,6 +929,38 @@ function App() {
       )}
       <CommandPalette commands={commands} />
 
+      <nav
+        aria-label="Previous and next page"
+        className="lg:hidden fixed bottom-0 inset-x-0 z-30 border-t border-zinc-800 bg-zinc-950/95 backdrop-blur"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
+        <div className="flex items-center gap-2 px-3 py-2">
+          <button
+            type="button"
+            className="btn"
+            disabled={!prevPage}
+            onClick={() => prevPage && goTo(prevPage.id)}
+            aria-label={prevPage ? `Back to ${prevPage.label}` : "No earlier page"}
+          >
+            ‹ {prevPage?.label ?? "Back"}
+          </button>
+          <button type="button" className="btn flex-1 min-w-0" onClick={() => setMenuOpen(true)} aria-label="Open the page menu">
+            <span className="truncate">
+              {pages.findIndex((x) => x.id === page) + 1}/{pages.length} · {current.label}
+            </span>
+          </button>
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={!nextPage}
+            onClick={() => nextPage && goTo(nextPage.id)}
+            aria-label={nextPage ? `On to ${nextPage.label}` : "No later page"}
+          >
+            {nextPage?.label ?? "Next"} ›
+          </button>
+        </div>
+      </nav>
+
       <div className="flex-1 min-w-0">
         <TopBar
           projectName={projectName}
@@ -951,7 +984,7 @@ function App() {
           onMenu={() => setMenuOpen(true)}
         />
 
-        <main className="p-4 sm:p-6 max-w-[1400px]">
+        <main className="p-4 sm:p-6 pb-24 lg:pb-6 max-w-[1400px]">
           <ProjectToolbar
             canUndo={history.canUndo}
             canRedo={history.canRedo}
