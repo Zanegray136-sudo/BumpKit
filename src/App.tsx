@@ -66,6 +66,7 @@ import type { ReportData } from "./utils/reportPdf";
 import { useInstall } from "./utils/useInstall";
 import { reportChecksAll } from "./utils/checks";
 import ProjectSummary from "./components/ProjectSummary";
+import InstallHint from "./components/InstallHint";
 import RevisionHistory from "./components/RevisionHistory";
 import { compareRevisions, useRevisions, type ScreenFigures } from "./utils/revisions";
 import ChecksMenu from "./components/ChecksMenu";
@@ -587,6 +588,7 @@ function App() {
     case "project":
       body = (
         <div className="max-w-4xl space-y-4">
+        <InstallHint />
         <ProjectSummary
           rows={screens.map((x, i) => ({
             id: x.id,
@@ -778,7 +780,11 @@ function App() {
                   }
                 />
                 <CurveSetup curve={curve} setCurve={setCurve} plan={curvePlan} panelChosen={!!selectedPanel} />
-                <ViewingDistance plan={selectedPanel ? calcViewing(selectedPanel.pitch, heightMetres) : null} />
+                <ViewingDistance
+                  plan={selectedPanel ? calcViewing(selectedPanel.pitch, heightMetres) : null}
+                  pitch={selectedPanel?.pitch ?? 0}
+                  panels={allPanels}
+                />
               </div>
               <div className="lg:col-span-2">
                 <ProcessorAnalysis
