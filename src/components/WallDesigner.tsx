@@ -42,6 +42,10 @@ export default function WallDesigner(p: Props) {
   const [figure, setFigure] = useState(false);
   const [floorGap, setFloorGap] = useState("0");
   const action = useRef<"remove" | "restore">("remove");
+  const [zoom, setZoom] = useState(1);
+  const box = useRef<HTMLDivElement>(null);
+  const pinch = useRef<{ dist: number; zoom: number } | null>(null);
+  const clampZoom = (z: number) => Math.min(3, Math.max(0.25, Math.round(z * 100) / 100));
 
   const total = p.wide * p.high;
   const active = total - [...p.removed].filter((k) => {
@@ -56,6 +60,15 @@ export default function WallDesigner(p: Props) {
       ? powerCells(p.powerPlan, p.wide, p.numberingMode, p.threePhase, p.removed, p.scale)
       : namesCells(p.wide, p.high, p.numberingMode, p.removed, p.scale);
 
+  const fit = () => {
+    const base = cells[0].reduce((sum, c) => sum + Math.round(cellSize(p.wide) * (c.wf ?? 1)), 0) + (p.wide - 1) * 6;
+    const avail = (box.current?.clientWidth ?? 600) - 130;
+    setZoom(clampZoom(avail / base));
+  };
+
+  const touchDist = (e: React.TouchEvent) =>
+    Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+
   const paint = (row: number, col: number, phase: "start" | "move") => {
     const k = keyOf(row, col);
     if (phase === "start") {
@@ -67,7 +80,7 @@ export default function WallDesigner(p: Props) {
     p.setRemoved([...next]);
   };
 
-  const size = cellSize(p.wide);
+  const size = Math.max(12, Math.round(cellSize(p.wide) * zoom));
   const gridWidth = cells[0].reduce((sum, cell) => sum + Math.round(size * (cell.wf ?? 1)), 0) + (p.wide - 1) * 6;
   const gridHeight = cells.reduce((sum, row) => sum + Math.round(size * (row[0]?.hf ?? 1)), 0) + (p.high - 1) * 6;
 
@@ -154,6 +167,25 @@ export default function WallDesigner(p: Props) {
           </div>
         </div>
 
+        <div className="mt-3 flex flex-wrap items-center gap-2" role="group" aria-label="Zoom the wall">
+          <button type="button" className="btn" aria-label="Zoom out" onClick={() => setZoom((z) => clampZoom(z / 1.25))}>
+            −
+          </button>
+          <span className="min-w-12 text-center text-sm text-zinc-300" aria-live="polite">
+            {Math.round(zoom * 100)}%
+          </span>
+          <button type="button" className="btn" aria-label="Zoom in" onClick={() => setZoom((z) => clampZoom(z * 1.25))}>
+            +
+          </button>
+          <button type="button" className="btn" onClick={fit}>
+            Fit
+          </button>
+          <button type="button" className="btn" onClick={() => setZoom(1)} disabled={zoom === 1}>
+            100%
+          </button>
+          <span className="text-xs text-zinc-500">On a touch screen you can also pinch the wall.</span>
+        </div>
+
         <p className="mt-3 text-sm text-zinc-400">
           {editing
             ? "Click or drag over cabinets to cut them out for doors, screens or odd shapes. Start on a cut-out cabinet to bring cabinets back."
@@ -164,7 +196,21 @@ export default function WallDesigner(p: Props) {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1fr_260px]">
-        <div className="panel overflow-auto">
+        <div
+          ref={box}
+          className="panel overflow-auto"
+          style={editing ? undefined : { touchAction: "pan-x pan-y" }}
+          onTouchStart={(e) => {
+            if (!editing && e.touches.length === 2) pinch.current = { dist: touchDist(e), zoom };
+          }}
+          onTouchMove={(e) => {
+            if (editing || e.touches.length !== 2 || !pinch.current || pinch.current.dist === 0) return;
+            setZoom(clampZoom(pinch.current.zoom * (touchDist(e) / pinch.current.dist)));
+          }}
+          onTouchEnd={(e) => {
+            if (e.touches.length < 2) pinch.current = null;
+          }}
+        >
           <div className="flex gap-2 w-max">
             <div
               className="relative shrink-0 w-8"
@@ -202,6 +248,7 @@ export default function WallDesigner(p: Props) {
                 cells={cells}
                 onPaint={editing ? paint : undefined}
                 cursor={editing ? "crosshair" : undefined}
+                zoom={zoom}
               />
             </div>
             {figure && p.hasPanel && p.cabinetHeightMm > 0 && (

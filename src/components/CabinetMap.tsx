@@ -54,15 +54,17 @@ type Props = {
   /** Called for the cabinet under the pointer while drawing */
   onPaint?: (row: number, col: number, phase: "start" | "move") => void;
   onPaintEnd?: () => void;
+  /** Multiplies the cabinet size, 1 = normal */
+  zoom?: number;
   /** Dim and hide removed cabinets' details */
   cursor?: string;
   /** "solid" fills each cabinet with its colour and shows the cable order large */
   variant?: "card" | "solid";
 };
 
-function CabinetMapInner({ cells, onPaint, onPaintEnd, cursor, variant = "card" }: Props) {
+function CabinetMapInner({ cells, onPaint, onPaintEnd, cursor, variant = "card", zoom = 1 }: Props) {
   const wide = cells[0]?.length ?? 0;
-  const size = cellSize(wide);
+  const size = Math.max(12, Math.round(cellSize(wide) * zoom));
   const compact = size < 70;
   const GAP = 6;
   const paths = useMemo(() => buildRunPaths(cells, GAP, size), [cells, size]);
