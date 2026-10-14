@@ -209,3 +209,11 @@ body {
     min-height: 36px;
   }
 }
+
+/* Installed app: no pull-to-refresh bounce, so a swipe down can't reload and lose your place. */
+@media (display-mode: standalone) {
+  html,
+  body {
+    overscroll-behavior-y: none;
+  }
+}

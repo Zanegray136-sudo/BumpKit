@@ -31,6 +31,11 @@ void boot()
 
 // Offline support, only in the built site (the dev server would cache stale code).
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  // If a new version takes over a page that was already open, offer a reload.
+  const hadController = !!navigator.serviceWorker.controller
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (hadController) window.dispatchEvent(new Event('pixelpatch-update'))
+  })
   window.addEventListener('load', () => {
     navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => {
       /* the app still works online without it */

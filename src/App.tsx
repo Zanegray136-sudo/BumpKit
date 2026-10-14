@@ -66,6 +66,7 @@ import type { ReportData } from "./utils/reportPdf";
 import { useInstall } from "./utils/useInstall";
 import { reportChecksAll } from "./utils/checks";
 import ProjectSummary from "./components/ProjectSummary";
+import AppStatus from "./components/AppStatus";
 import SharedBanner from "./components/SharedBanner";
 import { endSharedView, getSharedView } from "./utils/sharedView";
 import InstallHint from "./components/InstallHint";
@@ -270,6 +271,22 @@ function App() {
         load(parsed);
       })
       .catch(() => window.alert("That file couldn't be read."));
+
+  // The installed desktop app can be opened by double-clicking a project file.
+  useEffect(() => {
+    const lq = (window as unknown as {
+      launchQueue?: { setConsumer: (f: (p: { files: { getFile: () => Promise<File> }[] }) => void) => void };
+    }).launchQueue;
+    lq?.setConsumer(async (params) => {
+      const handle = params.files?.[0];
+      if (!handle) return;
+      const file = await handle.getFile();
+      if (window.confirm(`Open ${file.name}? It replaces the project in the app, so save a file first if you want to keep that one.`)) {
+        void openFile(file);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const { undo, redo } = history;
   useEffect(() => {
@@ -982,6 +999,7 @@ function App() {
         </div>
       )}
       <CommandPalette commands={commands} />
+      <AppStatus />
 
       <nav
         aria-label="Previous and next page"
