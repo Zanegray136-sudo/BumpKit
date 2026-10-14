@@ -62,7 +62,7 @@ export default function WallDesigner(p: Props) {
 
   const fit = () => {
     const base = cells[0].reduce((sum, c) => sum + Math.round(cellSize(p.wide) * (c.wf ?? 1)), 0) + (p.wide - 1) * 6;
-    const avail = (box.current?.clientWidth ?? 600) - 130;
+    const avail = (box.current?.clientWidth ?? 600) - 170;
     setZoom(clampZoom(avail / base));
   };
 
