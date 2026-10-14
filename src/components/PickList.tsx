@@ -185,7 +185,7 @@ export default function PickList({
           value={`${pickedCount} of ${items.length}`}
           sub={pickedCount === items.length && items.length > 0 ? "All picked" : undefined}
         />
-        <div className="flex items-end gap-2">
+        <div className="flex flex-wrap items-end gap-2">
           <button type="button" className="btn" onClick={downloadCsv} disabled={items.length === 0}>
             Download CSV
           </button>

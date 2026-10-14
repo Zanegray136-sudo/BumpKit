@@ -88,3 +88,18 @@ describe("portOptions", () => {
     expect(limited.find((o) => o.tags.includes("fewest"))?.ports).toBe(2);
   });
 });
+
+describe("portOptions with phases", () => {
+  const o = portOptions({ totalCabinets: 70, lineLength: 10, cabinetPixels: 1, pixelsPerPort: 1000, wholeLines: true, portLimit: 0, phases: 3 });
+
+  it("shows how evenly three phases are shared", () => {
+    const even = portOptions({ totalCabinets: 60, lineLength: 10, cabinetPixels: 1, pixelsPerPort: 1000, wholeLines: true, portLimit: 0, phases: 3 });
+    expect(even.find((r) => r.ports === 3)!.phaseSpreadPct!).toBeCloseTo(0, 0);
+    expect(o.find((r) => r.ports === 3)!.phaseSpreadPct!).toBeGreaterThan(20);
+  });
+
+  it("tags the best balanced count", () => {
+    const best = o.find((r) => r.tags.includes("phases"))!;
+    expect(best.phaseSpreadPct!).toBeCloseTo(Math.min(...o.map((r) => r.phaseSpreadPct!)), 6);
+  });
+});

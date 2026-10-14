@@ -13,7 +13,9 @@ export type PortOption = {
   fits: boolean;
   /** Needs more ports than the processor has */
   tooMany: boolean;
-  tags: ("fewest" | "comfortable" | "even")[];
+  /** How far apart the busiest and quietest phase are, %, when there are phases to share */
+  phaseSpreadPct: number | null;
+  tags: ("fewest" | "comfortable" | "even" | "phases")[];
 };
 
 /** Compares different numbers of data ports for the same wall. */
@@ -29,9 +31,12 @@ export function portOptions(args: {
   portLimit: number;
   /** Load treated as comfortable, % */
   comfortPct?: number;
+  /** Share the groups over this many phases (0 = not applicable) */
+  phases?: number;
 }): PortOption[] {
   const { totalCabinets, lineLength, cabinetPixels, pixelsPerPort, portLimit } = args;
   const comfort = args.comfortPct ?? 75;
+  const phases = args.phases ?? 0;
   if (totalCabinets <= 0 || cabinetPixels <= 0 || pixelsPerPort <= 0) return [];
 
   const needed = Math.max(1, Math.ceil((totalCabinets * cabinetPixels) / pixelsPerPort));
@@ -43,6 +48,15 @@ export function portOptions(args: {
     const most = Math.max(...counts);
     const least = Math.min(...counts);
     const busiestPct = ((most * cabinetPixels) / pixelsPerPort) * 100;
+    let phaseSpreadPct: number | null = null;
+    if (phases > 1) {
+      const load = Array.from({ length: phases }, () => 0);
+      [...counts].sort((a, b) => b - a).forEach((c) => {
+        load[load.indexOf(Math.min(...load))] += c;
+      });
+      const hi = Math.max(...load);
+      phaseSpreadPct = hi > 0 ? ((hi - Math.min(...load)) / hi) * 100 : 0;
+    }
     rows.push({
       ports: counts.length,
       most,
@@ -51,6 +65,7 @@ export function portOptions(args: {
       wholeLines: lineLength > 0 && counts.every((c) => c % lineLength === 0 || c === counts[counts.length - 1]),
       fits: busiestPct <= 100,
       tooMany: portLimit > 0 && counts.length > portLimit,
+      phaseSpreadPct,
       tags: [],
     });
   }
@@ -59,7 +74,11 @@ export function portOptions(args: {
   const fewest = usable[0];
   const comfortable = usable.find((r) => r.busiestPct <= comfort);
   const even = [...usable].sort((a, b) => a.most - a.least - (b.most - b.least) || a.ports - b.ports)[0];
+  const balanced = phases > 1
+    ? [...usable].sort((a, b) => (a.phaseSpreadPct ?? 0) - (b.phaseSpreadPct ?? 0) || a.ports - b.ports)[0]
+    : undefined;
   fewest?.tags.push("fewest");
+  if (balanced) balanced.tags.push("phases");
   comfortable?.tags.push("comfortable");
   even?.tags.push("even");
   return rows;

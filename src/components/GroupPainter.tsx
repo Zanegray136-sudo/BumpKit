@@ -108,8 +108,8 @@ export default function GroupPainter({
   };
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
-    <div className="space-y-3">
+    <div className="grid gap-4 grid-cols-[minmax(0,1fr)] xl:grid-cols-[minmax(0,1fr)_300px]">
+    <div className="space-y-3 min-w-0">
       <div className="flex flex-wrap items-center gap-2">
         <div
           role="radiogroup"

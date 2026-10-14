@@ -38,7 +38,7 @@ export const pages: Page[] = [
     label: "Data",
     title: "Data map",
     description:
-      "A suggested data map is made for you. Switch to Custom to draw the ports yourself.",
+      "A suggested data map is made for you. Pick a port and drag cabinets onto it to change it.",
   },
   {
     id: "canvas",
@@ -52,7 +52,7 @@ export const pages: Page[] = [
     label: "Power",
     title: "Power",
     description:
-      "A suggested power map is made for you. Switch to Custom to draw the circuits yourself.",
+      "A suggested power map is made for you. Pick a circuit and drag cabinets onto it to change it.",
   },
   {
     id: "distro",

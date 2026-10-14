@@ -65,10 +65,11 @@ export default function PowerWeightPlanner({
             pixelsPerPort: plan.usableAmps,
             wholeLines: settings.wholeLines,
             portLimit: 0,
+            phases: settings.supply === "three" ? 3 : 0,
           })
         : [],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [plan, settings.grouping, settings.wholeLines, cells]
+    [plan, settings.grouping, settings.wholeLines, settings.supply, cells]
   );
 
 

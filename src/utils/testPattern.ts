@@ -364,18 +364,33 @@ export function downloadPatternSvg(p: PatternInput, name: string, svg: string = 
 }
 
 /** PNG at the wall's native resolution, so one image pixel is one LED pixel. */
+/** Browsers refuse canvases past about 16,384 px a side or 268 million px in all. */
+const TOO_BIG_MSG = "This canvas is too large for the browser to turn into a PNG. Download the SVG instead, or split the wall into smaller screens.";
+
 export function downloadPatternPng(p: PatternInput, name: string, svg: string = testPatternSvg(p)) {
+  const { width, height } = p.canvas;
+  if (width > 16384 || height > 16384 || width * height > 268_000_000) {
+    window.alert(TOO_BIG_MSG);
+    return;
+  }
   const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
   const img = new Image();
   img.onload = () => {
     const canvas = document.createElement("canvas");
-    canvas.width = p.canvas.width;
-    canvas.height = p.canvas.height;
+    canvas.width = width;
+    canvas.height = height;
     const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     URL.revokeObjectURL(url);
-    canvas.toBlob((b) => b && save(b, `${name}.png`), "image/png");
+    if (!ctx) {
+      window.alert(TOO_BIG_MSG);
+      return;
+    }
+    ctx.drawImage(img, 0, 0, width, height);
+    canvas.toBlob((b) => (b ? save(b, `${name}.png`) : window.alert(TOO_BIG_MSG)), "image/png");
+  };
+  img.onerror = () => {
+    URL.revokeObjectURL(url);
+    window.alert("The browser couldn't draw this pattern. Try the SVG download instead.");
   };
   img.src = url;
 }

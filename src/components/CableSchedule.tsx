@@ -35,7 +35,7 @@ export default function CableSchedule({
       <div className="grid gap-3 sm:grid-cols-3">
         <Stat label="Cable runs" value={rows.length} sub={`${total} cables in all`} />
         <Stat label="Labels" value={labelCount} sub="Two per long run, one for each end" />
-        <div className="flex items-end gap-2">
+        <div className="flex flex-wrap items-end gap-2">
           <button type="button" className="btn" onClick={downloadCsv}>
             Download CSV
           </button>

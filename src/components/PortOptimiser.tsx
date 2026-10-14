@@ -4,6 +4,7 @@ const TAG_TEXT = {
   fewest: "Fewest ports",
   comfortable: "Comfortable load",
   even: "Most even",
+  phases: "Best phase balance",
 } as const;
 
 /** Compare counts of ports or circuits for the wall and apply one in a click. */
@@ -25,6 +26,7 @@ export default function PortOptimiser({
 }) {
   const rows = options;
   if (rows.length < 2) return null;
+  const showPhases = rows.some((r) => r.phaseSpreadPct !== null);
 
   return (
     <div className="panel">
@@ -42,6 +44,7 @@ export default function PortOptimiser({
               <th>Cabinets per {noun}</th>
               <th>Busiest {noun}</th>
               <th>Layout</th>
+              {showPhases && <th>Phase spread</th>}
               <th />
               <th />
             </tr>
@@ -55,6 +58,11 @@ export default function PortOptimiser({
                   {r.busiestPct.toFixed(0)}%{r.fits ? "" : " (over)"}
                 </td>
                 <td className="text-zinc-400">{r.wholeLines ? "Whole lines" : "Mixed"}</td>
+                {showPhases && (
+                  <td className={r.phaseSpreadPct !== null && r.phaseSpreadPct > 10 ? "text-amber-300" : "text-zinc-300"}>
+                    {r.phaseSpreadPct === null ? "-" : `${r.phaseSpreadPct.toFixed(0)}%`}
+                  </td>
+                )}
                 <td className="text-xs text-emerald-300">
                   {r.tags.map((t) => TAG_TEXT[t]).join(", ")}
                   {r.tooMany && <span className="text-red-300">More than {limitText}</span>}
