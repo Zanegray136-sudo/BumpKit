@@ -67,6 +67,8 @@ import { useInstall } from "./utils/useInstall";
 import { reportChecksAll } from "./utils/checks";
 import ProjectSummary from "./components/ProjectSummary";
 import InstallHint from "./components/InstallHint";
+import ProcessorSharing from "./components/ProcessorSharing";
+import { planSharing } from "./utils/processorSharing";
 import RevisionHistory from "./components/RevisionHistory";
 import { compareRevisions, useRevisions, type ScreenFigures } from "./utils/revisions";
 import ChecksMenu from "./components/ChecksMenu";
@@ -482,6 +484,24 @@ function App() {
     loadPct: Number(all[i].processorLoading) || 0,
   }));
 
+  const sharing = planSharing(
+    screens.map((x, i) => {
+      const k = all[i];
+      return {
+        id: x.id,
+        name: x.name,
+        processor: x.processor,
+        key: `${x.processor}|${x.distribution}|${k.effMaxPixels}|${k.availablePorts}`,
+        pixels: k.totalPixels,
+        ports: k.portsRequired,
+        maxPixels: k.effMaxPixels,
+        maxPorts: k.availablePorts,
+        now: k.processorsRequired,
+        copies: x.redundancy === "backup" && !x.backupSame ? 2 : 1,
+      };
+    })
+  );
+
   const savedRevisions = useRevisions();
   const lastSaved = savedRevisions[0];
   const changeList = lastSaved ? compareRevisions(lastSaved.screens, figures) : [];
@@ -611,6 +631,7 @@ function App() {
             goTo("screen");
           }}
         />
+        <ProcessorSharing plan={sharing} />
         <ProjectDetails
           projectName={projectName}
           setProjectName={setProjectName}
