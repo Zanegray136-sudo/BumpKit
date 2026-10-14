@@ -43,11 +43,11 @@ export default function TopBar(p: Props) {
 
   return (
     <header className="sticky top-0 z-20 bg-zinc-950/95 backdrop-blur border-b border-zinc-800">
-      <div className="min-h-14 px-4 sm:px-6 py-2 flex items-center gap-x-4 sm:gap-x-8 gap-y-2 flex-wrap">
+      <div className="min-h-14 px-4 sm:px-6 py-2 flex items-center gap-x-3 sm:gap-x-8 gap-y-2 flex-nowrap sm:flex-wrap">
         {p.onMenu && (
           <button
             type="button"
-            className="btn lg:hidden"
+            className="btn lg:hidden shrink-0"
             style={{ padding: "6px 10px" }}
             onClick={p.onMenu}
             aria-label="Open the page menu"
@@ -119,7 +119,7 @@ export default function TopBar(p: Props) {
             />
           </div>
         </div>
-        {p.extra}
+        <div className="shrink-0">{p.extra}</div>
       </div>
     </header>
   );

@@ -45,10 +45,12 @@ export default function ChecksMenu({ checks }: { checks: Check[] }) {
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="dialog"
+        aria-label={label}
         className="flex items-center gap-2 rounded-md border border-zinc-800 px-2.5 py-1.5 text-xs text-zinc-200 hover:bg-zinc-800/60"
       >
         <span aria-hidden="true" className={`h-2 w-2 rounded-full ${dot[level]}`} />
-        {label}
+        <span className="sm:hidden">{errors.length || warns.length || "OK"}</span>
+        <span className="hidden sm:inline">{label}</span>
       </button>
       {open && (
         <div
