@@ -49,3 +49,7 @@ Stack: React 19, TypeScript, Vite, Tailwind 4, jsPDF.
 ## Licence
 
 MIT. See `LICENSE`.
+
+## Tests
+
+`npm test` runs the checks on the planning maths (data ports, power circuits, phase balance, ballast, grouping, project files and share links). They need no extra packages, and the deploy workflow runs them before it publishes, so a change that breaks the numbers doesn't go live.

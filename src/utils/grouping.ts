@@ -31,9 +31,13 @@ export function suggestCounts(
     const base = Math.floor(totalLines / groups);
     const extra = totalLines % groups;
 
-    return Array.from({ length: groups }, (_, i) =>
-      (base + (i < extra ? 1 : 0)) * lineLength
-    );
+    // The last line may be short (cut-outs), so never count more than there are.
+    let left = total;
+    return Array.from({ length: groups }, (_, i) => {
+      const c = Math.min(left, (base + (i < extra ? 1 : 0)) * lineLength);
+      left -= c;
+      return c;
+    });
   }
 
   return balancedSplit(total, balancedGroups);
