@@ -217,7 +217,7 @@ export function testPatternSvg(p: PatternInput): string {
 export type UtilityKind =
   | "white" | "red" | "green" | "blue" | "black" | "grey"
   | "ramp-h" | "ramp-v" | "steps" | "bars"
-  | "ports" | "walk" | "cab-checker" | "pixel-checker" | "lines-h" | "lines-v";
+  | "template" | "ports" | "walk" | "cab-checker" | "pixel-checker" | "lines-h" | "lines-v";
 
 export const utilityPatterns: { id: UtilityKind; label: string; note: string }[] = [
   { id: "white", label: "Full white", note: "Check brightness, uniformity and dead or stuck pixels" },
@@ -230,6 +230,7 @@ export const utilityPatterns: { id: UtilityKind; label: string; note: string }[]
   { id: "ramp-v", label: "Grey ramp, top to bottom", note: "Banding and gamma down the wall" },
   { id: "steps", label: "16 grey steps", note: "Low-level detail and black crush" },
   { id: "bars", label: "Colour bars", note: "Full-screen bars with a grey ramp" },
+  { id: "template", label: "Content template", note: "For the content team: canvas size, safe zones, centre and thirds. Keep logos and text inside the cyan line" },
   { id: "ports", label: "Port colours", note: "Every cabinet filled with its port colour, to check data cabling" },
   { id: "walk", label: "Cabinet walk", note: "Step along the cable path one cabinet at a time. The white cabinet is the latest one on the cable, so you can check wiring order on site" },
   { id: "cab-checker", label: "Cabinet checkerboard", note: "Cabinet edges and any cabinet in the wrong place" },
@@ -282,6 +283,36 @@ export function utilityPatternSvg(
         o.push(`<rect x="${x0}" y="0" width="${x1 - x0}" height="${barH}" fill="${col}"/>`);
       });
       o.push(`<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000"/><stop offset="1" stop-color="#fff"/></linearGradient></defs>`, `<rect y="${barH}" width="${W}" height="${H - barH}" fill="url(#g)"/>`);
+      break;
+    }
+    case "template": {
+      const m = Math.min(W, H);
+      const sw = Math.max(2, Math.round(m / 360));
+      const fs = Math.max(12, Math.round(m * 0.028));
+      const font = `font-family="Helvetica, Arial, sans-serif" shape-rendering="auto"`;
+      fill("#1b1f24");
+      // Thirds and the centre cross
+      for (let i = 1; i < 3; i++) {
+        o.push(`<line x1="${Math.round((W * i) / 3)}" y1="0" x2="${Math.round((W * i) / 3)}" y2="${H}" stroke="#ffffff" stroke-opacity="0.18" stroke-width="${sw}"/>`);
+        o.push(`<line x1="0" y1="${Math.round((H * i) / 3)}" x2="${W}" y2="${Math.round((H * i) / 3)}" stroke="#ffffff" stroke-opacity="0.18" stroke-width="${sw}"/>`);
+      }
+      o.push(`<line x1="${W / 2}" y1="0" x2="${W / 2}" y2="${H}" stroke="#ffffff" stroke-opacity="0.5" stroke-width="${sw}"/>`);
+      o.push(`<line x1="0" y1="${H / 2}" x2="${W}" y2="${H / 2}" stroke="#ffffff" stroke-opacity="0.5" stroke-width="${sw}"/>`);
+      o.push(`<line x1="0" y1="0" x2="${W}" y2="${H}" stroke="#ffffff" stroke-opacity="0.12" stroke-width="${sw}"/>`);
+      o.push(`<line x1="${W}" y1="0" x2="0" y2="${H}" stroke="#ffffff" stroke-opacity="0.12" stroke-width="${sw}"/>`);
+      // Safe zones: 95% for action, 90% for text and logos
+      const zone = (pct: number, col: string, label: string) => {
+        const x = Math.round((W * (1 - pct)) / 2);
+        const y = Math.round((H * (1 - pct)) / 2);
+        o.push(`<rect x="${x}" y="${y}" width="${W - 2 * x}" height="${H - 2 * y}" fill="none" stroke="${col}" stroke-width="${sw * 2}" stroke-dasharray="${sw * 8} ${sw * 5}"/>`);
+        o.push(`<text x="${x + fs * 0.6}" y="${y + fs * 1.5}" fill="${col}" font-size="${fs}" font-weight="700" ${font}>${label}</text>`);
+      };
+      zone(0.95, "#ffd400", "ACTION SAFE 95%");
+      zone(0.8, "#00e5ff", "TEXT AND LOGOS SAFE 80%");
+      // Canvas edge and size
+      o.push(`<rect x="${sw}" y="${sw}" width="${W - 2 * sw}" height="${H - 2 * sw}" fill="none" stroke="#ff3b30" stroke-width="${sw * 2}"/>`);
+      o.push(`<text x="${W / 2}" y="${H / 2 - fs * 0.4}" fill="#ffffff" font-size="${Math.round(m * 0.09)}" font-weight="700" text-anchor="middle" ${font}>${W} x ${H}</text>`);
+      o.push(`<text x="${W / 2}" y="${H / 2 + fs * 1.6}" fill="#ffffff" fill-opacity="0.7" font-size="${fs}" text-anchor="middle" ${font}>Canvas edge in red. Centre and thirds marked.</text>`);
       break;
     }
     case "ports": {

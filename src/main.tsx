@@ -2,7 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import { decodeProject } from './utils/shareLink'
-import { loadSaved, saveLocal } from './utils/projectFile'
+import { startSharedView } from './utils/sharedView'
 
 /** Opens a shared link (if there is one), then starts the app. */
 async function boot() {
@@ -13,11 +13,9 @@ async function boot() {
     window.history.replaceState(null, '', window.location.pathname + window.location.hash)
     if (!file) {
       window.alert("That share link couldn't be read. It may have been cut short when it was copied.")
-    } else if (
-      !loadSaved() ||
-      window.confirm('Open the shared project? It will replace the project saved in this browser. Save a file first if you want to keep that one.')
-    ) {
-      saveLocal(file)
+    } else {
+      // Open it for viewing. The project saved in this browser is left alone.
+      startSharedView(file)
     }
   }
   // Loaded after the link is handled, because the app reads the saved project when it starts.

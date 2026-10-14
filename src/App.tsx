@@ -66,6 +66,8 @@ import type { ReportData } from "./utils/reportPdf";
 import { useInstall } from "./utils/useInstall";
 import { reportChecksAll } from "./utils/checks";
 import ProjectSummary from "./components/ProjectSummary";
+import SharedBanner from "./components/SharedBanner";
+import { endSharedView, getSharedView } from "./utils/sharedView";
 import InstallHint from "./components/InstallHint";
 import ProcessorSharing from "./components/ProcessorSharing";
 import { planSharing } from "./utils/processorSharing";
@@ -75,7 +77,8 @@ import ChecksMenu from "./components/ChecksMenu";
 import CommandPalette, { type Command } from "./components/CommandPalette";
 
 // Pick up where the person left off (read once, when the app starts).
-const initial: ProjectFile = loadSaved() ?? emptyProject();
+const sharedAtStart = getSharedView();
+const initial: ProjectFile = sharedAtStart ?? loadSaved() ?? emptyProject();
 
 // Heavy pages (PDF building, the wall designer, the test pattern) load on demand.
 const EngineeringReport = lazy(() => import("./components/EngineeringReport"));
@@ -216,7 +219,10 @@ function App() {
   });
 
   const [saveStatus, setSaveStatus] = useState("");
+  const [viewing, setViewing] = useState(sharedAtStart !== null);
   useEffect(() => {
+    // A shared project is only kept if the person chooses to keep it.
+    if (viewing) return;
     // Keep a copy in the browser a moment after each change.
     const timer = setTimeout(() => {
       const ok = saveLocal(snapshot());
@@ -228,7 +234,7 @@ function App() {
     }, 600);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [screens, activeId, projectName, client, venue, engineer, revision, notes, pickSettings, picked, units, customPanels, distro]);
+  }, [viewing, screens, activeId, projectName, client, venue, engineer, revision, notes, pickSettings, picked, units, customPanels, distro]);
 
   const load = (file: ProjectFile) => {
     setUnitsState(file.units);
@@ -1037,6 +1043,20 @@ function App() {
         />
 
         <main className="p-4 sm:p-6 pb-24 lg:pb-6 max-w-[1400px]">
+          {viewing && (
+            <SharedBanner
+              hasOwn={loadSaved() !== null}
+              onKeep={() => {
+                saveLocal(snapshot());
+                endSharedView();
+                setViewing(false);
+              }}
+              onLeave={() => {
+                endSharedView();
+                window.location.reload();
+              }}
+            />
+          )}
           <ProjectToolbar
             canUndo={history.canUndo}
             canRedo={history.canRedo}
