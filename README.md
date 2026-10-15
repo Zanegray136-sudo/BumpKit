@@ -1,4 +1,4 @@
-# PixelPatch
+# PixelPlan
 
 A browser tool for planning LED video walls: pick a panel and processor, size the wall, and get the data map, power plan, rigging figures, cable schedule, pick list and an engineering report. Everything runs in the browser and projects are saved to a file or a share link.
 

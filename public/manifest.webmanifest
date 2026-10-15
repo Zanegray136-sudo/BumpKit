@@ -1,7 +1,7 @@
 {
   "id": "./",
-  "name": "PixelPatch",
-  "short_name": "PixelPatch",
+  "name": "PixelPlan",
+  "short_name": "PixelPlan",
   "description": "Plan LED walls: data, power, rigging, cables, pick list and report.",
   "lang": "en",
   "dir": "ltr",
@@ -25,7 +25,7 @@
     { "name": "Report and checklist", "short_name": "Report", "url": "./#/report", "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }] }
   ],
   "file_handlers": [
-    { "action": "./", "name": "PixelPatch project", "accept": { "application/json": [".ledproject.json"] } }
+    { "action": "./", "name": "PixelPlan project", "accept": { "application/json": [".ledproject.json"] } }
   ],
   "launch_handler": { "client_mode": "focus-existing" }
 }

@@ -11,11 +11,11 @@ export default function AppStatus() {
     const upd = () => setUpdate(true);
     window.addEventListener("online", on);
     window.addEventListener("offline", off);
-    window.addEventListener("pixelpatch-update", upd);
+    window.addEventListener("pixelplan-update", upd);
     return () => {
       window.removeEventListener("online", on);
       window.removeEventListener("offline", off);
-      window.removeEventListener("pixelpatch-update", upd);
+      window.removeEventListener("pixelplan-update", upd);
     };
   }, []);
 
@@ -30,7 +30,7 @@ export default function AppStatus() {
       )}
       {update && (
         <div role="status" className="pointer-events-auto flex flex-wrap items-center gap-3 rounded-lg border border-sky-500/40 bg-zinc-900 px-3 py-2 text-sm text-sky-100 shadow-lg">
-          A new version of PixelPatch is ready.
+          A new version of PixelPlan is ready.
           <button type="button" className="btn-primary" onClick={() => window.location.reload()}>
             Reload
           </button>

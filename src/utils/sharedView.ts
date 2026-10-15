@@ -1,6 +1,6 @@
 import { parseProject, projectText, type ProjectFile } from "./projectFile";
 
-const KEY = "pixelpatch.shared-view";
+const KEY = "pixelplan.shared-view";
 let memory: ProjectFile | null = null;
 
 /** Keeps a shared project for this browser tab only. The saved project is not touched. */

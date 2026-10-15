@@ -4,7 +4,7 @@
  * - Built files have fingerprinted names that never change, so they are served from the
  *   cache first and fetched once.
  * - Everything else is served from the cache and refreshed in the background. */
-const CACHE = "pixelpatch-v2";
+const CACHE = "pixelplan-v3";
 
 self.addEventListener("install", () => self.skipWaiting());
 

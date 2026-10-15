@@ -36,7 +36,7 @@ export type Change = {
 
 const KEY = "open-av-toolkit.revisions";
 const MAX = 20;
-const EVENT = "pixelpatch-revisions";
+const EVENT = "pixelplan-revisions";
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
