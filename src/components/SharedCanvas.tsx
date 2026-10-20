@@ -224,18 +224,20 @@ export default function SharedCanvas({ screens, setLayout, setup, setSetup, proj
         </div>
       )}
 
-      <div className="mt-3 space-y-4">
+      <div className={`mt-3 grid gap-4 ${count > 1 ? "md:grid-cols-2" : ""}`}>
         {sizes.map((size, ci) => {
           const room = fixed ? 1 : FIT_ROOM;
           const w = Math.max(size.width, 1) * room;
           const h = Math.max(size.height, 1) * room;
           const here = shown.filter((p) => p.canvas === ci);
-          const scale = 640 / w;
+          // Line and text sizes follow the width the canvas is drawn at, so several canvases side by side stay legible.
+          const scale = (count > 1 ? 440 : 640) / w;
           return (
-            <div key={ci}>
-              <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+            <div key={ci} className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/40 p-3">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs text-zinc-400">
-                  Canvas {ci + 1}, {size.width} x {size.height} px, {here.length} screen{here.length === 1 ? "" : "s"}
+                  <span className="mr-2 rounded bg-zinc-800 px-1.5 py-0.5 font-semibold text-zinc-100">Canvas {ci + 1}</span>
+                  {size.width} x {size.height} px, {here.length} screen{here.length === 1 ? "" : "s"}
                 </span>
                 <span className="flex gap-2">
                   <button type="button" className="btn" disabled={here.length === 0} onClick={() => downloadCombinedSvg(svgFor(ci), name(ci))}>
@@ -248,12 +250,16 @@ export default function SharedCanvas({ screens, setLayout, setup, setSetup, proj
               </div>
               <svg
                 viewBox={`0 0 ${w} ${h}`}
-                className="w-full touch-none rounded border border-zinc-800 bg-zinc-950"
-                style={{ maxHeight: 360 }}
+                className="block w-full touch-none rounded border border-zinc-800 bg-zinc-950"
                 role="img"
                 aria-label={`Screen layout on canvas ${ci + 1}`}
               >
                 {!fixed && <rect x={0} y={0} width={size.width} height={size.height} fill="none" stroke="#71717a" strokeDasharray="12 8" strokeWidth={Math.max(2, 1 / scale)} pointerEvents="none" />}
+                {here.length === 0 && (
+                  <text x={w / 2} y={h / 2} textAnchor="middle" dominantBaseline="middle" fill="#71717a" fontSize={14 / scale} pointerEvents="none">
+                    Empty. Send a screen here from the table below.
+                  </text>
+                )}
                 {fixed && <SafeLinesSvg width={size.width} height={size.height} unit={1 / scale} />}
                 {here.map((p) => {
                   const col = colourFor(screens.findIndex((s) => s.id === p.id) + 1);
