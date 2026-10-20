@@ -52,7 +52,7 @@ import { EmptyState, PageHeader } from "./components/ui";
 import { fmtKg, setUnits, type Units } from "./utils/units";
 import { canShare, makeShareUrl } from "./utils/shareLink";
 import TemplatePicker from "./components/TemplatePicker";
-import WelcomeCard from "./components/WelcomeCard";
+import WelcomeDialog, { welcomeSeen } from "./components/WelcomeCard";
 import Disclosure from "./components/Disclosure";
 import ThemeSetting from "./components/ThemeSetting";
 import { applyTheme, readTheme, setTheme, watchSystemTheme } from "./utils/theme";
@@ -95,6 +95,7 @@ const CanvasPage = lazy(() => import("./components/CanvasPage"));
 
 function App() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [welcomeOpen, setWelcomeOpen] = useState(() => !welcomeSeen() && sharedAtStart === null);
   const [page, setPage] = useState<PageId>(() =>
     pageFromHash(window.location.hash)
   );
@@ -630,6 +631,7 @@ function App() {
       { id: "save", label: "Save project file", group: "Action", run: () => saveFile() },
       ...(install ? [{ id: "install", label: "Install the app", group: "Action", run: install }] : []),
       { id: "units-m", label: "Show metric units", group: "Action", run: () => setUnitsState("metric") },
+      { id: "welcome", label: "Show the welcome guide", group: "Action", run: () => setWelcomeOpen(true) },
       { id: "theme-dark", label: "Use the dark theme", group: "Action", run: () => setTheme("dark") },
       { id: "theme-light", label: "Use the light theme", group: "Action", run: () => setTheme("light") },
       { id: "units-i", label: "Show imperial units", group: "Action", run: () => setUnitsState("imperial") },
@@ -685,19 +687,6 @@ function App() {
       body = (
         <div className="max-w-4xl space-y-4">
         <InstallHint />
-        <WelcomeCard
-          onGo={(id) => goTo(id as PageId)}
-          onSample={() => {
-            const t = templates.find((x) => x.id === "stage") ?? templates[0];
-            const made = templateScreens(t);
-            setScreens(made);
-            setActiveId(made[0].id);
-            nextNumber.current = made.length + 1;
-            if (!projectName.trim()) setProjectName("Sample conference");
-            if (!client.trim()) setClient("Example Events");
-            if (!venue.trim()) setVenue("Example Convention Centre");
-          }}
-        />
         <TemplatePicker
           onPick={(t) => {
             if (!window.confirm(`Replace this project's screens with "${t.name}"?`)) return;
@@ -1078,6 +1067,21 @@ function App() {
           </div>
         </div>
       )}
+      <WelcomeDialog
+        open={welcomeOpen}
+        onClose={() => setWelcomeOpen(false)}
+        onGo={(id) => goTo(id as PageId)}
+        onSample={() => {
+            const t = templates.find((x) => x.id === "stage") ?? templates[0];
+            const made = templateScreens(t);
+            setScreens(made);
+            setActiveId(made[0].id);
+            nextNumber.current = made.length + 1;
+            if (!projectName.trim()) setProjectName("Sample conference");
+            if (!client.trim()) setClient("Example Events");
+            if (!venue.trim()) setVenue("Example Convention Centre");
+        }}
+      />
       <CommandPalette commands={commands} />
       <AppStatus />
 
