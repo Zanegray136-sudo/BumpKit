@@ -237,7 +237,7 @@ function FramePlacer({
             (e.target as Element).setPointerCapture(e.pointerId);
             setDragging(true);
           }}
-          onPointerMove={(e) => dragging && move(e)}
+          onPointerMove={(e) => grab.current && move(e)}
           onPointerUp={() => {
             grab.current = null;
             setDragging(false);
