@@ -81,7 +81,7 @@ const cleanPanels = (v: unknown): LedPanel[] => {
 const cleanDistro = (v: unknown): DistroSettings => {
   const o = isObj(v) ? v : {};
   const n = (k: keyof DistroSettings, lo: number, hi: number) =>
-    typeof o[k] === "number" && Number.isFinite(o[k]) ? Math.min(hi, Math.max(lo, o[k] as number)) : defaultDistro[k];
+    typeof o[k] === "number" && Number.isFinite(o[k]) ? Math.min(hi, Math.max(lo, o[k] as number)) : (defaultDistro[k] as number);
   return {
     ways: Math.round(n("ways", 1, 48)),
     feedLengthM: n("feedLengthM", 0, 500),
@@ -90,6 +90,7 @@ const cleanDistro = (v: unknown): DistroSettings => {
     mainsMm2: n("mainsMm2", 1.5, 120),
     generatorMargin: n("generatorMargin", 0, 200),
     maxDropPct: n("maxDropPct", 0.5, 20),
+    perScreen: o.perScreen === true,
   };
 };
 

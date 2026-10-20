@@ -1,7 +1,7 @@
 import type { DistroPlan, DistroSettings } from "../utils/distro";
 import { cableAmpacity, cableSizes } from "../utils/distro";
 import { fmtM } from "../utils/units";
-import { NumberField, Notice, SettingsGroup, Select, Stat } from "./ui";
+import { NumberField, Notice, SettingsGroup, Select, Stat, Toggle } from "./ui";
 
 type Props = {
   plan: DistroPlan | null;
@@ -23,6 +23,9 @@ export default function PowerDistro({ plan, settings: s, setSettings }: Props) {
         <div className="space-y-4">
           <SettingsGroup title="Distro boxes">
             <NumberField label="Outputs per distro" value={s.ways} min={1} onChange={(v) => set("ways", Math.max(1, Math.round(v) || 1))} />
+            <div className="flex items-end pb-2">
+              <Toggle label="Separate distro for each screen" checked={s.perScreen} onChange={(v) => set("perScreen", v)} />
+            </div>
           </SettingsGroup>
           <SettingsGroup title="Distro to the wall">
             <NumberField label="Average run (m)" value={s.feedLengthM} min={0} onChange={(v) => set("feedLengthM", Math.max(0, v))} />
@@ -77,7 +80,10 @@ export default function PowerDistro({ plan, settings: s, setSettings }: Props) {
                 <tbody className="divide-y divide-zinc-800 text-zinc-200">
                   {plan.units.map((u) => (
                     <tr key={u.number}>
-                      <td className="py-2 pr-4 font-semibold">D{u.number}</td>
+                      <td className="py-2 pr-4 font-semibold">
+                        D{u.number}
+                        {u.screen && <span className="ml-2 font-normal text-zinc-400">{u.screen}</span>}
+                      </td>
                       <td className="pr-4">
                         {u.used} of {s.ways}
                       </td>

@@ -433,6 +433,7 @@ function App() {
       if (x.powerSettings.supply === "three") three = true;
       plan.circuits.forEach((cc) =>
         circuits.push({
+          group: x.id,
           screen: screens.length > 1 ? x.name : "",
           number: cc.number,
           cabinets: cc.cabinets,

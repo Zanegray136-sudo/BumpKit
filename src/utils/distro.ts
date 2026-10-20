@@ -13,6 +13,8 @@ export type DistroSettings = {
   generatorMargin: number;
   /** Voltage drop you will accept, % */
   maxDropPct: number;
+  /** Give each screen its own distro boxes instead of sharing them across screens */
+  perScreen: boolean;
 };
 
 export const defaultDistro: DistroSettings = {
@@ -23,9 +25,12 @@ export const defaultDistro: DistroSettings = {
   mainsMm2: 16,
   generatorMargin: 25,
   maxDropPct: 3,
+  perScreen: false,
 };
 
 export type DistroCircuit = {
+  /** Which screen the circuit belongs to (an id, so renamed or unnamed screens stay apart) */
+  group?: string;
   screen: string;
   number: number;
   cabinets: number;
@@ -44,6 +49,8 @@ export type DistroRow = DistroCircuit & {
 
 export type DistroUnit = {
   number: number;
+  /** The screen this distro serves, when each screen has its own */
+  screen: string;
   used: number;
   /** Amps on each phase (one entry on a single-phase job) */
   phaseAmps: { phase: string; amps: number }[];
@@ -106,31 +113,44 @@ export function calcDistro(circuits: DistroCircuit[], threePhaseJob: boolean, s:
   const rows: DistroRow[] = [];
 
   // Each distro takes the next run of circuits, so cables to one wall stay together.
-  for (let start = 0; start < live.length; start += ways) {
-    const chunk = live.slice(start, start + ways);
-    const distro = start / ways + 1;
-    const order = [...chunk.keys()].sort((a, b) => chunk[b].amps - chunk[a].amps);
-    const assigned = new Map<number, string>();
-    order.forEach((idx) => {
-      // Biggest first, onto whichever phase is lightest overall.
-      const phase = phases.reduce((best, p) => (load[p] < load[best] ? p : best), phases[0]);
-      load[phase] += chunk[idx].amps;
-      assigned.set(idx, phase);
+  // With "per screen" on, a distro never mixes circuits from two screens.
+  const groups: DistroCircuit[][] = [];
+  if (s.perScreen) {
+    const byKey = new Map<string, DistroCircuit[]>();
+    live.forEach((c) => {
+      const key = c.group ?? c.screen;
+      byKey.set(key, [...(byKey.get(key) ?? []), c]);
     });
-    chunk.forEach((c, i) => {
-      const dropV = (2 * s.feedLengthM * c.amps * RHO) / Math.max(0.1, s.cableMm2);
-      rows.push({
-        ...c,
-        distro,
-        way: i + 1,
-        phase: assigned.get(i) ?? phases[0],
-        dropPct: c.voltage > 0 ? (dropV / c.voltage) * 100 : 0,
+    groups.push(...byKey.values());
+  } else groups.push(live);
+  let distro = 0;
+  for (const group of groups) {
+    for (let start = 0; start < group.length; start += ways) {
+      const chunk = group.slice(start, start + ways);
+      distro += 1;
+      const order = [...chunk.keys()].sort((a, b) => chunk[b].amps - chunk[a].amps);
+      const assigned = new Map<number, string>();
+      order.forEach((idx) => {
+        // Biggest first, onto whichever phase is lightest overall.
+        const phase = phases.reduce((best, p) => (load[p] < load[best] ? p : best), phases[0]);
+        load[phase] += chunk[idx].amps;
+        assigned.set(idx, phase);
       });
-    });
+      chunk.forEach((c, i) => {
+        const dropV = (2 * s.feedLengthM * c.amps * RHO) / Math.max(0.1, s.cableMm2);
+        rows.push({
+          ...c,
+          distro,
+          way: i + 1,
+          phase: assigned.get(i) ?? phases[0],
+          dropPct: c.voltage > 0 ? (dropV / c.voltage) * 100 : 0,
+        });
+      });
+    }
   }
 
   const voltage = live[0].voltage;
-  const unitCount = Math.ceil(live.length / ways);
+  const unitCount = distro;
   const units: DistroUnit[] = Array.from({ length: unitCount }, (_, k) => {
     const mine = rows.filter((r) => r.distro === k + 1);
     const phaseAmps = phases.map((p) => ({
@@ -144,6 +164,7 @@ export function calcDistro(circuits: DistroCircuit[], threePhaseJob: boolean, s:
     const ref = threePhaseJob ? voltage * Math.sqrt(3) : voltage;
     return {
       number: k + 1,
+      screen: s.perScreen ? mine[0]?.screen ?? "" : "",
       used: mine.length,
       phaseAmps,
       inputAmps,

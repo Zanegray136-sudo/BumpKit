@@ -1033,14 +1033,14 @@ export function buildReport(d: ReportData, o: ReportOptions): jsPDF {
     y += 3;
     table(
       [
-        { header: "Distro", width: 14 },
+        { header: "Distro", width: 38 },
         { header: "Ways used", width: 18, align: "right" },
-        { header: "Load per phase", width: 52 },
+        { header: "Load per phase", width: 44 },
         { header: "Feed needed", width: 34 },
         { header: "Supply drop", width: 20, align: "right" },
       ],
       dp.units.map((u) => [
-        `D${u.number}`,
+        `D${u.number}${u.screen ? ` ${u.screen}` : ""}`,
         `${u.used} of ${ds.ways}`,
         u.phaseAmps.map((p) => `${p.phase} ${p.amps.toFixed(1)} A`).join("   "),
         u.supplyAmps ? `${u.supplyAmps} A ${dp.three ? "3 phase" : "1 phase"}` : "Over 630 A",
