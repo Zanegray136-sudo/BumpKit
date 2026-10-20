@@ -128,7 +128,9 @@ export function snapMove(
   box: { w: number; h: number },
   canvas: { width: number; height: number },
   others: { x: number; y: number; w: number; h: number }[],
-  tol: number
+  tol: number,
+  /** Extra lines to snap to (the safe areas), as x and y positions for the screen's top left */
+  lines: { xs: number[]; ys: number[] } = { xs: [], ys: [] }
 ) {
   const near = (v: number, targets: number[]) => {
     let best = v;
@@ -143,8 +145,8 @@ export function snapMove(
     return dist <= tol ? best : v;
   };
   return {
-    x: near(pos.x, [0, canvas.width - box.w, ...others.flatMap((o) => [o.x, o.x + o.w, o.x + o.w - box.w, o.x - box.w])]),
-    y: near(pos.y, [0, canvas.height - box.h, ...others.flatMap((o) => [o.y, o.y + o.h, o.y + o.h - box.h, o.y - box.h])]),
+    x: near(pos.x, [0, canvas.width - box.w, ...lines.xs, ...others.flatMap((o) => [o.x, o.x + o.w, o.x + o.w - box.w, o.x - box.w])]),
+    y: near(pos.y, [0, canvas.height - box.h, ...lines.ys, ...others.flatMap((o) => [o.y, o.y + o.h, o.y + o.h - box.h, o.y - box.h])]),
   };
 }
 
@@ -226,3 +228,9 @@ export function downloadCombinedPng(svg: string, width: number, height: number, 
   };
   img.src = url;
 }
+
+/** Hard stop: keep a screen wholly inside its canvas (a screen bigger than the canvas sits at 0). */
+export const keepInside = (pos: { x: number; y: number }, box: { w: number; h: number }, canvas: { width: number; height: number }) => ({
+  x: Math.max(0, Math.min(pos.x, canvas.width - box.w)),
+  y: Math.max(0, Math.min(pos.y, canvas.height - box.h)),
+});

@@ -1,11 +1,12 @@
 import { useMemo, useRef } from "react";
-import { SafeLinesSvg, SafeToggle } from "./SafeLines";
+import { SafeLinesSvg, SafeToggle, useSafeLines } from "./SafeLines";
 import type { PatternInput } from "../utils/testPattern";
 import {
   MAX_CANVASES,
   arrangeMulti,
   canvasSizes,
   clampCount,
+  keepInside,
   combinedSvg,
   downloadCombinedPng,
   downloadCombinedSvg,
@@ -21,7 +22,7 @@ import {
   type CanvasSetup,
   type Placed,
 } from "../utils/sharedCanvas";
-import { videoFrames } from "../utils/videoFrames";
+import { safeAreas, videoFrames } from "../utils/videoFrames";
 import { colourFor } from "./CabinetMap";
 import { Notice } from "./ui";
 
@@ -77,6 +78,11 @@ export default function SharedCanvas({ screens, setLayout, setup, setSetup, proj
   const base = `${(projectName || "project").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-")}-canvas`;
   const patterns = new Map(screens.map((s) => [s.id, s.pattern]));
   const fixed = setup.mode !== "fit";
+  const safeOn = useSafeLines();
+  const safeLines = (size: { width: number; height: number }, box: { w: number; h: number }) => {
+    const sa = safeAreas(size.width, size.height);
+    return { xs: sa.flatMap((a) => [a.x, a.x + a.width - box.w]), ys: sa.flatMap((a) => [a.y, a.y + a.height - box.h]) };
+  };
 
   /** Fix every screen that is still auto-placed where it now sits, so dragging one does not shift the rest. */
   const freeze = (): Change[] => placed.filter((p) => !screens.find((s) => s.id === p.id)?.pos).map((p) => ({ id: p.id, pos: { x: p.x, y: p.y }, canvas: p.canvas }));
@@ -99,10 +105,16 @@ export default function SharedCanvas({ screens, setLayout, setup, setSetup, proj
     }
   };
   const target = (e: React.PointerEvent, d: Drag) => {
-    const raw = { x: Math.max(0, Math.round(d.fromX + (e.clientX - d.startX) * d.scale)), y: Math.max(0, Math.round(d.fromY + (e.clientY - d.startY) * d.scale)) };
-    if (e.altKey) return raw;
-    const others = placed.filter((p) => p.canvas === d.canvas && p.id !== d.id);
-    return snapMove(raw, { w: d.w, h: d.h }, d.frozen[d.canvas], others, Math.round(8 * d.scale));
+    const size = d.frozen[d.canvas];
+    const box = { w: d.w, h: d.h };
+    let raw = { x: Math.max(0, Math.round(d.fromX + (e.clientX - d.startX) * d.scale)), y: Math.max(0, Math.round(d.fromY + (e.clientY - d.startY) * d.scale)) };
+    if (!e.altKey) {
+      const others = placed.filter((p) => p.canvas === d.canvas && p.id !== d.id);
+      const lines = fixed && safeOn ? safeLines(size, box) : undefined;
+      raw = snapMove(raw, box, size, others, Math.round(8 * d.scale), lines);
+    }
+    // Hard stop at the canvas edge. A fit canvas has no fixed edge, so it can still grow.
+    return fixed ? keepInside(raw, box, size) : raw;
   };
   // While dragging, move the shapes directly. React only hears about it when the drag ends,
   // so the page does not re-render on every pointer event.
@@ -130,7 +142,10 @@ export default function SharedCanvas({ screens, setLayout, setup, setSetup, proj
 
   const edit = (p: Placed, patch: { x?: number; y?: number; canvas?: number }) => {
     const rest = freeze().filter((c) => c.id !== p.id);
-    setLayout([...rest, { id: p.id, pos: { x: patch.x ?? p.x, y: patch.y ?? p.y }, canvas: patch.canvas ?? p.canvas }]);
+    const to = patch.canvas ?? p.canvas;
+    let pos = { x: patch.x ?? p.x, y: patch.y ?? p.y };
+    if (fixed && sizes[to]) pos = keepInside(pos, { w: p.w, h: p.h }, sizes[to]);
+    setLayout([...rest, { id: p.id, pos, canvas: to }]);
   };
   const num = (v: string) => Math.max(0, Math.round(Number(v) || 0));
   const set = (patch: Partial<CanvasSetup>) => setSetup({ ...setup, ...patch });
@@ -189,7 +204,7 @@ export default function SharedCanvas({ screens, setLayout, setup, setSetup, proj
         )}
       </div>
       <p className="mt-2 text-xs text-zinc-400">
-        Drag a screen to place it (grab it and move). It snaps to the canvas edge and to other screens. {fixed ? "Every canvas is the size you chose." : "Each canvas is as big as the screens on it."} Unplaced screens are packed left to right, and on a fixed size they fill one canvas then the next.
+        Drag a screen to place it (grab it and move). It snaps to the canvas edges, the safe lines and other screens, and on a fixed size it cannot be dragged off the canvas. Hold Alt to move without snapping. {fixed ? "Every canvas is the size you chose." : "Each canvas is as big as the screens on it."} Unplaced screens are packed left to right, and on a fixed size they fill one canvas then the next.
       </p>
 
       {fixed && (

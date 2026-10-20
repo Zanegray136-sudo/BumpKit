@@ -87,3 +87,16 @@ describe("several canvases", () => {
     expect(snapMove({ x: 1005, y: 400 }, { w: 500, h: 500 }, size, [{ x: 0, y: 0, w: 1000, h: 1000 }], 8)).toEqual({ x: 1000, y: 400 });
   });
 });
+
+import { keepInside } from "../src/utils/sharedCanvas";
+describe("hard stop at the canvas edge", () => {
+  it("keeps a screen inside its canvas", () => {
+    const c = { width: 3840, height: 2160 };
+    expect(keepInside({ x: 3000, y: 2000 }, { w: 2400, h: 1200 }, c)).toEqual({ x: 1440, y: 960 });
+    expect(keepInside({ x: -5, y: 10 }, { w: 2400, h: 1200 }, c)).toEqual({ x: 0, y: 10 });
+    expect(keepInside({ x: 50, y: 50 }, { w: 5000, h: 3000 }, c)).toEqual({ x: 0, y: 0 });
+  });
+  it("snaps to extra lines", () => {
+    expect(snapMove({ x: 270, y: 100 }, { w: 100, h: 100 }, { width: 3840, height: 2160 }, [], 8, { xs: [268], ys: [] })).toEqual({ x: 268, y: 100 });
+  });
+});
