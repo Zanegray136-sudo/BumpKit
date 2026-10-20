@@ -7,6 +7,7 @@ import {
   type ReportOptions,
   type ReportSectionId,
 } from "../utils/reportPdf";
+import { buildClientSummary } from "../utils/clientSummary";
 import { buildCabinetCsv, buildPortCsv } from "../utils/cabinetCsv";
 import { processorSheetText } from "../utils/processorSheet";
 import { Select } from "./ui";
@@ -110,6 +111,11 @@ export default function EngineeringReport({ data }: { data: ReportData }) {
       .replace(/\s+/g, "-");
     const rev = (data.project.revision || "").replace(/\W+/g, "");
     buildReport(data, options).save(`${base}${rev ? `-${rev}` : ""}.pdf`);
+  };
+
+  const downloadClientSummary = () => {
+    const base = (data.project.name || "Project").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-");
+    buildClientSummary(data, options.paper).save(`${base}-client-summary.pdf`);
   };
 
   const saveCsv = (text: string, suffix: string, ext = "csv") => {
@@ -240,6 +246,9 @@ export default function EngineeringReport({ data }: { data: ReportData }) {
             disabled={!data.screen}
           >
             Download PDF
+          </button>
+          <button type="button" className="btn w-full mt-2" onClick={downloadClientSummary} disabled={!data.screen}>
+            One-page client summary
           </button>
         </div>
       </div>
