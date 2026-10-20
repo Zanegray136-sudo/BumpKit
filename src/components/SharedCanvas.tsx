@@ -42,6 +42,9 @@ type Props = {
   projectName: string;
 };
 
+/** In "fit" mode the preview shows spare room around the canvas so there is somewhere to drag to. */
+const FIT_ROOM = 1.6;
+
 type Drag = {
   id: string;
   canvas: number;
@@ -80,7 +83,7 @@ export default function SharedCanvas({ screens, setLayout, setup, setSetup, proj
     if (!svg) return;
     const box = svg.getBoundingClientRect();
     const size = live[p.canvas];
-    const scale = box.width > 0 ? size.width / box.width : 1;
+    const scale = box.width > 0 ? size.width * (fixed ? 1 : FIT_ROOM) / box.width : 1;
     const d: Drag = { id: p.id, canvas: p.canvas, startX: e.clientX, startY: e.clientY, fromX: p.x, fromY: p.y, scale, frozen: live };
     dragRef.current = d;
     setDrag(d);
@@ -177,7 +180,7 @@ export default function SharedCanvas({ screens, setLayout, setup, setSetup, proj
         )}
       </div>
       <p className="mt-2 text-xs text-zinc-400">
-        Drag a screen to place it. It snaps to the canvas edge and to other screens. {fixed ? "Every canvas is the size you chose." : "Each canvas is as big as the screens on it."} Unplaced screens are packed left to right, and on a fixed size they fill one canvas then the next.
+        Drag a screen to place it (grab it and move). It snaps to the canvas edge and to other screens. {fixed ? "Every canvas is the size you chose." : "Each canvas is as big as the screens on it."} Unplaced screens are packed left to right, and on a fixed size they fill one canvas then the next.
       </p>
 
       {clash.length > 0 && (
@@ -193,8 +196,9 @@ export default function SharedCanvas({ screens, setLayout, setup, setSetup, proj
 
       <div className="mt-3 space-y-4">
         {sizes.map((size, ci) => {
-          const w = Math.max(size.width, 1);
-          const h = Math.max(size.height, 1);
+          const room = fixed ? 1 : FIT_ROOM;
+          const w = Math.max(size.width, 1) * room;
+          const h = Math.max(size.height, 1) * room;
           const here = shown.filter((p) => p.canvas === ci);
           const scale = 640 / w;
           return (
@@ -219,6 +223,7 @@ export default function SharedCanvas({ screens, setLayout, setup, setSetup, proj
                 role="img"
                 aria-label={`Screen layout on canvas ${ci + 1}`}
               >
+                {!fixed && <rect x={0} y={0} width={size.width} height={size.height} fill="none" stroke="#71717a" strokeDasharray="12 8" strokeWidth={Math.max(2, 1 / scale)} pointerEvents="none" />}
                 {here.map((p) => {
                   const col = colourFor(screens.findIndex((s) => s.id === p.id) + 1);
                   return (

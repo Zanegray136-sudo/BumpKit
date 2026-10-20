@@ -49,7 +49,7 @@ describe("several canvases", () => {
     expect(clampCount(3.4)).toBe(3);
   });
   it("reads fixed sizes", () => {
-    expect(canvasSize(defaultCanvasSetup)).toBeNull();
+    expect(canvasSize({ ...defaultCanvasSetup, mode: "fit" })).toBeNull();
     expect(canvasSize({ ...defaultCanvasSetup, mode: "uhd4k" })).toEqual({ width: 3840, height: 2160 });
     expect(canvasSize({ ...defaultCanvasSetup, mode: "custom", customW: 2000, customH: 1000 })).toEqual({ width: 2000, height: 1000 });
   });
@@ -62,9 +62,9 @@ describe("several canvases", () => {
     expect(small.map((p) => p.canvas)).toEqual([0, 1, 1]);
   });
   it("gives each screen its own canvas in turn when canvases fit their screens", () => {
-    const out = arrangeMulti(items, { ...defaultCanvasSetup, count: 3 });
+    const out = arrangeMulti(items, { ...defaultCanvasSetup, mode: "fit", count: 3 });
     expect(out.map((p) => p.canvas)).toEqual([0, 1, 2]);
-    expect(canvasSizes(out, { ...defaultCanvasSetup, count: 3 })[1]).toEqual({ width: 1920, height: 1080 });
+    expect(canvasSizes(out, { ...defaultCanvasSetup, mode: "fit", count: 3 })[1]).toEqual({ width: 1920, height: 1080 });
   });
   it("honours a chosen canvas and position", () => {
     const out = arrangeMulti([{ ...items[0], pos: { x: 10, y: 20 }, canvas: 1 }], { ...defaultCanvasSetup, count: 2 });

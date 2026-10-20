@@ -27,7 +27,7 @@ export type CanvasSetup = {
 };
 
 export const MAX_CANVASES = 8;
-export const defaultCanvasSetup: CanvasSetup = { count: 1, mode: "fit", customW: 3840, customH: 2160 };
+export const defaultCanvasSetup: CanvasSetup = { count: 1, mode: "uhd4k", customW: 3840, customH: 2160 };
 
 export const clampCount = (n: number) => Math.max(1, Math.min(MAX_CANVASES, Math.round(Number.isFinite(n) ? n : 1)));
 
