@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { CABINET_HEADER, cabinetsToCsv, parseCabinetCsv } from "../utils/customCabinets";
 import { CUSTOM_MAKER, ledPanels, type LedPanel } from "../data/ledPanels";
 import { Field } from "./ui";
 
@@ -17,6 +18,31 @@ export default function CustomPanels({ list, setList, onAdded, onRemoved }: Prop
   const [open, setOpen] = useState(false);
   const [d, setD] = useState(blank);
   const [error, setError] = useState("");
+  const fileIn = useRef<HTMLInputElement>(null);
+  const [importMsg, setImportMsg] = useState<string[]>([]);
+  const download = (name: string, text: string) => {
+    const url = URL.createObjectURL(new Blob([text], { type: "text/csv" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  const importCsv = (file: File) =>
+    file
+      .text()
+      .then((text) => {
+        const r = parseCabinetCsv(text, [...list.map((p) => p.model), ...ledPanels.map((p) => p.model)]);
+        if (r.added.length) {
+          setList([...list, ...r.added]);
+          onAdded(r.added[r.added.length - 1].model);
+        }
+        setImportMsg([
+          r.added.length ? `Added ${r.added.length} cabinet${r.added.length === 1 ? "" : "s"}.` : "No cabinets added.",
+          ...r.skipped.map((x) => `Line ${x.line}: ${x.reason}`),
+        ]);
+      })
+      .catch(() => setImportMsg(["That file couldn't be read."]));
   const set = (k: keyof typeof blank) => (e: React.ChangeEvent<HTMLInputElement>) => setD({ ...d, [k]: e.target.value });
 
   const add = () => {
@@ -52,6 +78,42 @@ export default function CustomPanels({ list, setList, onAdded, onRemoved }: Prop
       <p className="mt-2 text-xs text-zinc-400">
         Use this for a panel that isn&apos;t in the list. Weight and power are used exactly as you type them, so copy them from the spec sheet.
       </p>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <button type="button" className="btn" onClick={() => fileIn.current?.click()}>
+          Import from CSV
+        </button>
+        {list.length > 0 && (
+          <button type="button" className="btn" onClick={() => download("pixelplan-cabinets.csv", cabinetsToCsv(list))}>
+            Export your cabinets
+          </button>
+        )}
+        <button
+          type="button"
+          className="text-xs text-blue-300 hover:underline"
+          onClick={() => download("pixelplan-cabinet-template.csv", CABINET_HEADER.join(",") + "\n")}
+        >
+          Download a blank template
+        </button>
+        <input
+          ref={fileIn}
+          type="file"
+          accept=".csv,text/csv"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void importCsv(f);
+            e.target.value = "";
+          }}
+        />
+      </div>
+      {importMsg.length > 0 && (
+        <ul className="mt-2 space-y-0.5 text-xs text-zinc-300" role="status">
+          {importMsg.map((m, i) => (
+            <li key={i}>{m}</li>
+          ))}
+        </ul>
+      )}
 
       {open && (
         <div className="mt-4 space-y-3">
