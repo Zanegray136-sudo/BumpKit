@@ -9,6 +9,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "test": "node tests/run.mjs",
+    "smoke": "node tests/smoke.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

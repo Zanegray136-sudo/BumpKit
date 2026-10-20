@@ -53,6 +53,7 @@ import { fmtKg, setUnits, type Units } from "./utils/units";
 import { canShare, makeShareUrl } from "./utils/shareLink";
 import TemplatePicker from "./components/TemplatePicker";
 import WelcomeCard from "./components/WelcomeCard";
+import Disclosure from "./components/Disclosure";
 import ThemeSetting from "./components/ThemeSetting";
 import { applyTheme, readTheme, setTheme, watchSystemTheme } from "./utils/theme";
 import { templates } from "./data/templates";
@@ -797,6 +798,7 @@ function App() {
               />
               <div className="space-y-4">
                 <PanelInfo panel={selectedPanel} />
+                <Disclosure title="Your own cabinets" hint="Add, import or export cabinets that aren't in the list" defaultOpen={customPanels.length > 0}>
                 <CustomPanels
                   list={customPanels}
                   setList={setCustomPanelsState}
@@ -808,6 +810,7 @@ function App() {
                     setScreens((list) => list.map((x) => (x.model === m ? { ...x, model: "" } : x)))
                   }
                 />
+                </Disclosure>
               </div>
             </div>
           )}
@@ -827,21 +830,23 @@ function App() {
                 />
                 <ProcessorInfo processor={selectedProcessor} unit={selectedUnit} />
               </div>
-              <ContentSettings
-                content={st.content}
-                setContent={setContent}
-                processor={selectedProcessor}
-                factor={c.capacityFactor}
-                effMaxPixels={c.effMaxPixels}
-                effPixelsPerPort={c.effPixelsPerPort}
-              />
-              <ProcessorOutputs
-                processorName={processor}
-                totalPorts={availablePorts}
-                ports={dataPlan.ports}
-                redundancy={redundancy}
-                backupSame={backupSame}
-              />
+              <Disclosure title="Signal and port detail" hint="Bit depth, frame rate and how the processor's ports are used">
+                <ContentSettings
+                  content={st.content}
+                  setContent={setContent}
+                  processor={selectedProcessor}
+                  factor={c.capacityFactor}
+                  effMaxPixels={c.effMaxPixels}
+                  effPixelsPerPort={c.effPixelsPerPort}
+                />
+                <ProcessorOutputs
+                  processorName={processor}
+                  totalPorts={availablePorts}
+                  ports={dataPlan.ports}
+                  redundancy={redundancy}
+                  backupSame={backupSame}
+                />
+              </Disclosure>
               {processorsRequired > 1 && (
                 <ProcessorAllocation
                   processorsRequired={processorsRequired}
