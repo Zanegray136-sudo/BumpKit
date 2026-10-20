@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { SafeLinesSvg, SafeToggle } from "./SafeLines";
 import { chosenFrame, clampOffset, exactFrame, fitText, frameOffset, frameReport, snapOffset, type FrameChoice } from "../utils/videoFrames";
 
 /** Compare the canvas with standard video frames, and pick the canvas size the downloads use. */
@@ -137,8 +138,8 @@ export default function StandardFrames({
 function FramePlacer({
   frame,
   wall,
-  off,
-  onMove,
+  off: committed,
+  onMove: commit,
   onPreset,
 }: {
   frame: { width: number; height: number; name: string };
@@ -150,6 +151,23 @@ function FramePlacer({
   const svg = useRef<SVGSVGElement>(null);
   const grab = useRef<{ dx: number; dy: number } | null>(null);
   const [dragging, setDragging] = useState(false);
+  // The wall follows the pointer here; the choice is saved (and the download picture rebuilt) when the drag ends.
+  const [drafted, setDrafted] = useState<{ x: number; y: number } | null>(null);
+  const draft = useRef<{ x: number; y: number } | null>(null);
+  const off = drafted ?? committed;
+  const onMove = (pos: { x: number; y: number }) => {
+    if (grab.current) {
+      draft.current = pos;
+      setDrafted(pos);
+    } else commit(pos);
+  };
+  const finish = () => {
+    if (draft.current) commit(draft.current);
+    draft.current = null;
+    setDrafted(null);
+    grab.current = null;
+    setDragging(false);
+  };
   const cx = Math.round((frame.width - wall.width) / 2);
   const cy = Math.round((frame.height - wall.height) / 2);
   const roomX = frame.width - wall.width;
@@ -185,6 +203,9 @@ function FramePlacer({
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <span className="text-sm font-semibold text-zinc-100">Position in the {frame.name} frame</span>
         <span className="text-xs text-zinc-500">Drag the wall, or use the arrow keys (Shift for 100 px, Alt for 1 px).</span>
+        <span className="ml-auto">
+          <SafeToggle />
+        </span>
       </div>
       <svg
         ref={svg}
@@ -221,15 +242,10 @@ function FramePlacer({
             setDragging(true);
           }}
           onPointerMove={(e) => grab.current && move(e)}
-          onPointerUp={() => {
-            grab.current = null;
-            setDragging(false);
-          }}
-          onPointerCancel={() => {
-            grab.current = null;
-            setDragging(false);
-          }}
+          onPointerUp={finish}
+          onPointerCancel={finish}
         />
+        <SafeLinesSvg width={frame.width} height={frame.height} unit={frame.width / 1000} />
         <text
           x={off.x + wall.width / 2}
           y={off.y + wall.height / 2}

@@ -174,3 +174,39 @@ export function storeFrameChoice(c: FrameChoice) {
     /* kept for this visit only */
   }
 }
+
+/** SMPTE safe areas as a share of the frame: action safe 93 %, title safe 90 % (SMPTE RP 218 / ST 2046-1). */
+export const safeAreaShares = [
+  { id: "action", label: "Action safe 93%", share: 0.93 },
+  { id: "title", label: "Title safe 90%", share: 0.9 },
+] as const;
+
+export function safeAreas(width: number, height: number) {
+  return safeAreaShares.map((a) => {
+    const w = Math.round(width * a.share);
+    const h = Math.round(height * a.share);
+    return { id: a.id, label: a.label, x: Math.round((width - w) / 2), y: Math.round((height - h) / 2), width: w, height: h };
+  });
+}
+
+const SAFE_KEY = "pixelplan.safe-lines";
+const safeListeners = new Set<() => void>();
+export const readSafeLines = (): boolean => {
+  try {
+    return localStorage.getItem(SAFE_KEY) !== "off";
+  } catch {
+    return true;
+  }
+};
+export function storeSafeLines(on: boolean) {
+  try {
+    localStorage.setItem(SAFE_KEY, on ? "on" : "off");
+  } catch {
+    /* kept for this visit only */
+  }
+  safeListeners.forEach((f) => f());
+}
+export const onSafeLines = (f: () => void) => {
+  safeListeners.add(f);
+  return () => void safeListeners.delete(f);
+};

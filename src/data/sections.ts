@@ -8,7 +8,6 @@ export type PageId =
   | "rigging"
   | "cables"
   | "picklist"
-  | "designer"
   | "report";
 
 export type Page = {
@@ -81,13 +80,6 @@ export const pages: Page[] = [
     title: "Pick list",
     description:
       "Everything to pack for the wall, worked out from your data and power plans. Tick items off as you pick them.",
-  },
-  {
-    id: "designer",
-    label: "Designer",
-    title: "Wall designer",
-    description:
-      "See the wall to scale, cut out cabinets for odd shapes, and export drawings of the cabinet names, data or power.",
   },
   {
     id: "report",

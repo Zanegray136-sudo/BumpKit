@@ -77,3 +77,13 @@ describe("dragging the wall in the frame", () => {
     expect([centred.x, centred.y]).toEqual([720, 480]);
   });
 });
+
+import { safeAreas } from "../src/utils/videoFrames";
+
+describe("SMPTE safe areas", () => {
+  it("centres action safe 93% and title safe 90% in the frame", () => {
+    const [action, title] = safeAreas(1920, 1080);
+    expect(action).toEqual({ id: "action", label: "Action safe 93%", x: 67, y: 38, width: 1786, height: 1004 });
+    expect(title).toEqual({ id: "title", label: "Title safe 90%", x: 96, y: 54, width: 1728, height: 972 });
+  });
+});

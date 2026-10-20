@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef } from "react";
+import { SafeLinesSvg, SafeToggle } from "./SafeLines";
 import type { PatternInput } from "../utils/testPattern";
 import {
   MAX_CANVASES,
@@ -54,6 +55,11 @@ type Drag = {
   fromY: number;
   scale: number;
   frozen: { width: number; height: number }[];
+  rect: SVGRectElement;
+  label: SVGTextElement | null;
+  w: number;
+  h: number;
+  cur: { x: number; y: number };
 };
 
 /** Every screen on one or more canvases, for media servers that drive them from shared outputs. Screens can be dragged. */
@@ -63,12 +69,9 @@ export default function SharedCanvas({ screens, setLayout, setup, setSetup, proj
   const placed = useMemo(() => arrangeMulti(items, setup), [key]); // eslint-disable-line react-hooks/exhaustive-deps
   const live = canvasSizes(placed, setup);
   const count = clampCount(setup.count);
-  const [drag, setDrag] = useState<Drag | null>(null);
   const dragRef = useRef<Drag | null>(null);
-  // While dragging, keep each canvas the size it was, so the view does not jump around.
-  const sizes = drag ? drag.frozen : live;
-  const [live2, setLive2] = useState<{ id: string; x: number; y: number } | null>(null);
-  const shown: Placed[] = live2 ? placed.map((p) => (p.id === live2.id ? { ...p, x: live2.x, y: live2.y } : p)) : placed;
+  const sizes = live;
+  const shown: Placed[] = placed;
   const clash = overlaps(shown);
   const spill = outside(shown, sizes);
   const base = `${(projectName || "project").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-")}-canvas`;
@@ -83,38 +86,44 @@ export default function SharedCanvas({ screens, setLayout, setup, setSetup, proj
     if (!svg) return;
     const box = svg.getBoundingClientRect();
     const size = live[p.canvas];
-    const scale = box.width > 0 ? size.width * (fixed ? 1 : FIT_ROOM) / box.width : 1;
-    const d: Drag = { id: p.id, canvas: p.canvas, startX: e.clientX, startY: e.clientY, fromX: p.x, fromY: p.y, scale, frozen: live };
-    dragRef.current = d;
-    setDrag(d);
+    const scale = box.width > 0 ? (size.width * (fixed ? 1 : FIT_ROOM)) / box.width : 1;
+    const rect = e.currentTarget;
+    const label = rect.parentElement?.querySelector("text") ?? null;
+    dragRef.current = { id: p.id, canvas: p.canvas, startX: e.clientX, startY: e.clientY, fromX: p.x, fromY: p.y, scale, frozen: live, rect, label, w: p.w, h: p.h, cur: { x: p.x, y: p.y } };
+    rect.style.cursor = "grabbing";
+    rect.setAttribute("fill-opacity", "0.4");
     try {
-      e.currentTarget.setPointerCapture(e.pointerId);
+      rect.setPointerCapture(e.pointerId);
     } catch {
       /* some browsers refuse capture on synthetic events */
     }
   };
   const target = (e: React.PointerEvent, d: Drag) => {
-    const me = placed.find((p) => p.id === d.id)!;
     const raw = { x: Math.max(0, Math.round(d.fromX + (e.clientX - d.startX) * d.scale)), y: Math.max(0, Math.round(d.fromY + (e.clientY - d.startY) * d.scale)) };
-    const size = d.frozen[d.canvas];
+    if (e.altKey) return raw;
     const others = placed.filter((p) => p.canvas === d.canvas && p.id !== d.id);
-    const tol = Math.round(8 * d.scale);
-    return snapMove(raw, { w: me.w, h: me.h }, size, others, tol);
+    return snapMove(raw, { w: d.w, h: d.h }, d.frozen[d.canvas], others, Math.round(8 * d.scale));
   };
+  // While dragging, move the shapes directly. React only hears about it when the drag ends,
+  // so the page does not re-render on every pointer event.
   const onMove = (e: React.PointerEvent) => {
     const d = dragRef.current;
     if (!d) return;
     const t = target(e, d);
-    setLive2({ id: d.id, ...t });
+    d.cur = t;
+    d.rect.setAttribute("x", String(t.x));
+    d.rect.setAttribute("y", String(t.y));
+    d.label?.setAttribute("x", String(t.x + d.w / 2));
+    d.label?.setAttribute("y", String(t.y + d.h / 2));
   };
   const onUp = (e: React.PointerEvent) => {
     const d = dragRef.current;
     if (!d) return;
-    const t = target(e, d);
     dragRef.current = null;
-    setDrag(null);
-    setLive2(null);
-    if (t.x === d.fromX && t.y === d.fromY && Math.abs(e.clientX - d.startX) < 3 && Math.abs(e.clientY - d.startY) < 3) return;
+    d.rect.style.cursor = "grab";
+    d.rect.setAttribute("fill-opacity", "0.2");
+    const t = target(e, d);
+    if (t.x === d.fromX && t.y === d.fromY) return;
     const rest = freeze().filter((c) => c.id !== d.id);
     setLayout([...rest, { id: d.id, pos: t, canvas: d.canvas }]);
   };
@@ -183,6 +192,12 @@ export default function SharedCanvas({ screens, setLayout, setup, setSetup, proj
         Drag a screen to place it (grab it and move). It snaps to the canvas edge and to other screens. {fixed ? "Every canvas is the size you chose." : "Each canvas is as big as the screens on it."} Unplaced screens are packed left to right, and on a fixed size they fill one canvas then the next.
       </p>
 
+      {fixed && (
+        <div className="mt-2">
+          <SafeToggle />
+        </div>
+      )}
+
       {clash.length > 0 && (
         <div className="mt-3">
           <Notice kind="warn">These screens overlap on a canvas: {clash.join("; ")}.</Notice>
@@ -224,6 +239,7 @@ export default function SharedCanvas({ screens, setLayout, setup, setSetup, proj
                 aria-label={`Screen layout on canvas ${ci + 1}`}
               >
                 {!fixed && <rect x={0} y={0} width={size.width} height={size.height} fill="none" stroke="#71717a" strokeDasharray="12 8" strokeWidth={Math.max(2, 1 / scale)} pointerEvents="none" />}
+                {fixed && <SafeLinesSvg width={size.width} height={size.height} unit={1 / scale} />}
                 {here.map((p) => {
                   const col = colourFor(screens.findIndex((s) => s.id === p.id) + 1);
                   return (
@@ -235,10 +251,10 @@ export default function SharedCanvas({ screens, setLayout, setup, setSetup, proj
                         width={p.w}
                         height={p.h}
                         fill={col}
-                        fillOpacity={drag?.id === p.id ? 0.4 : 0.2}
+                        fillOpacity={0.2}
                         stroke={col}
                         strokeWidth={Math.max(2, 1 / scale)}
-                        style={{ cursor: drag?.id === p.id ? "grabbing" : "grab" }}
+                        style={{ cursor: "grab" }}
                         onPointerDown={(e) => onDown(e, p)}
                         onPointerMove={onMove}
                         onPointerUp={onUp}

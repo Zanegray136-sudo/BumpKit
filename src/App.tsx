@@ -89,9 +89,8 @@ import CommandPalette, { type Command } from "./components/CommandPalette";
 const sharedAtStart = getSharedView();
 const initial: ProjectFile = sharedAtStart ?? loadSaved() ?? emptyProject();
 
-// Heavy pages (PDF building, the wall designer, the test pattern) load on demand.
+// Heavy pages (PDF building, the test pattern) load on demand.
 const EngineeringReport = lazy(() => import("./components/EngineeringReport"));
-const WallDesigner = lazy(() => import("./components/WallDesigner"));
 const CanvasPage = lazy(() => import("./components/CanvasPage"));
 
 function App() {
@@ -187,7 +186,6 @@ function App() {
   const setNumberingMode = setter("numberingMode");
   const setRedundancy = setter("redundancy");
   const setBackupSame = setter("backupSame");
-  const setRemovedKeys = setter("removedKeys");
   const setCustomChains = setter("customChains");
   const setPowerSettings = setter("powerSettings");
   const setCustomCircuits = setter("customCircuits");
@@ -1020,33 +1018,6 @@ function App() {
           picked={picked}
           setPicked={setPicked}
           projectName={projectName}
-        />
-      );
-      break;
-
-    case "designer":
-      body = (
-        <WallDesigner
-          wide={wide}
-          high={high}
-          removed={removed}
-          setRemoved={setRemovedKeys}
-          numberingMode={numberingMode}
-          redundancy={redundancy}
-          dataPlan={dataPlan}
-          powerPlan={powerPlan}
-          threePhase={powerSettings.supply === "three"}
-          scale={scale}
-          hasPanel={!!selectedPanel}
-          projectName={projectName}
-          panelName={selectedPanel ? `${selectedPanel.manufacturer} ${selectedPanel.model}` : ""}
-          widthMetres={widthMetres}
-          heightMetres={heightMetres}
-          cabinetHeightMm={selectedPanel?.height ?? 0}
-          resWidth={resWidth}
-          resHeight={resHeight}
-          weightKg={totalWeight}
-          powerKw={totalPower / 1000}
         />
       );
       break;
