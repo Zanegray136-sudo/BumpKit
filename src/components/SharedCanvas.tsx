@@ -153,7 +153,7 @@ export default function SharedCanvas({ screens, setLayout, setup, setSetup, proj
         </label>
         <label className="text-sm text-zinc-400">
           <span className="block text-xs">Canvas size</span>
-          <select className="input" value={setup.mode} aria-label="Canvas size" onChange={(e) => set({ mode: e.target.value })}>
+          <select className="input" value={setup.mode} aria-label="All-screens canvas size" onChange={(e) => set({ mode: e.target.value })}>
             <option value="fit">Fit the screens</option>
             {videoFrames.map((f) => (
               <option key={f.id} value={f.id}>
@@ -167,11 +167,11 @@ export default function SharedCanvas({ screens, setLayout, setup, setSetup, proj
           <>
             <label className="text-sm text-zinc-400">
               <span className="block text-xs">Width px</span>
-              <input type="number" className="input !w-24" min={16} max={16384} value={setup.customW} aria-label="Custom canvas width" onChange={(e) => set({ customW: Math.max(16, Math.min(16384, num(e.target.value))) })} />
+              <input type="number" className="input !w-24" min={16} max={16384} value={setup.customW} aria-label="All-screens canvas width" onChange={(e) => set({ customW: Math.max(16, Math.min(16384, num(e.target.value))) })} />
             </label>
             <label className="text-sm text-zinc-400">
               <span className="block text-xs">Height px</span>
-              <input type="number" className="input !w-24" min={16} max={16384} value={setup.customH} aria-label="Custom canvas height" onChange={(e) => set({ customH: Math.max(16, Math.min(16384, num(e.target.value))) })} />
+              <input type="number" className="input !w-24" min={16} max={16384} value={setup.customH} aria-label="All-screens canvas height" onChange={(e) => set({ customH: Math.max(16, Math.min(16384, num(e.target.value))) })} />
             </label>
           </>
         )}
