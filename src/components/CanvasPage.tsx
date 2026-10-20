@@ -16,7 +16,8 @@ import {
 } from "../utils/testPattern";
 import SharedCanvas, { type SharedScreen } from "./SharedCanvas";
 import StandardFrames from "./StandardFrames";
-import { arrange, bounds } from "../utils/sharedCanvas";
+import { arrange, bounds, type CanvasFrame } from "../utils/sharedCanvas";
+import { chosenFrame, frameOffset, readFrameChoice, storeFrameChoice, wrapInFrame, type FrameChoice } from "../utils/videoFrames";
 import { ModeSwitchGeneric, Select, Stat } from "./ui";
 
 const chips: [keyof PatternToggles, string][] = [
@@ -67,6 +68,19 @@ export default function CanvasPage({
     if (!shared || shared.length < 2) return null;
     return bounds(arrange(shared.map((x) => ({ id: x.id, name: x.name, w: x.pattern.canvas.width, h: x.pattern.canvas.height, pos: x.pos }))));
   }, [shared]);
+  // The canvas size the person chose for downloads (a standard frame, a custom size, or just the wall).
+  const [frameChoice, setFrameChoiceState] = useState<FrameChoice>(readFrameChoice);
+  const setFrameChoice = (c: FrameChoice) => {
+    setFrameChoiceState(c);
+    storeFrameChoice(c);
+  };
+  const frame = chosenFrame(frameChoice);
+  const frameFor = (w: number, h: number): CanvasFrame | null => {
+    if (!frame) return null;
+    const off = frameOffset(w, h, frame, frameChoice.align);
+    return off ? { width: frame.width, height: frame.height, ...off } : null;
+  };
+  const screenFrame = frameFor(canvas.width, canvas.height);
   const aspect = canvas.height > 0 ? canvas.width / canvas.height : 0;
 
   const input: PatternInput = {
@@ -98,6 +112,11 @@ export default function CanvasPage({
         : utilityPatternSvg(kind, canvas, input.portOf, { order: walkOrder, step: walkAt }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [canvas, dataPlan, numberingMode, deferredTitle, stats, toggles, kind, walkOrder, walkAt]
+  );
+  const outSvg = useMemo(
+    () => (screenFrame && frame ? wrapInFrame(patternSvg, screenFrame, frame) : patternSvg),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [patternSvg, screenFrame?.width, screenFrame?.height, screenFrame?.x, screenFrame?.y]
   );
   const kindInfo = utilityPatterns.find((u) => u.id === kind);
   // A blob URL avoids percent-encoding a multi-megabyte string.
@@ -146,12 +165,19 @@ export default function CanvasPage({
           />
           {view === "pattern" && (
             <div className="flex flex-wrap items-center gap-2">
-              <button type="button" className="btn" onClick={() => downloadPatternPng(input, fileBase, patternSvg)}>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => downloadPatternPng(input, fileBase, outSvg, screenFrame ?? undefined)}
+              >
                 Download PNG
               </button>
-              <button type="button" className="btn" onClick={() => downloadPatternSvg(input, fileBase, patternSvg)}>
+              <button type="button" className="btn" onClick={() => downloadPatternSvg(input, fileBase, outSvg)}>
                 Download SVG
               </button>
+              {screenFrame && frame && (
+                <span className="text-xs text-zinc-400">On a {frame.name} canvas</span>
+              )}
             </div>
           )}
         </div>
@@ -280,9 +306,9 @@ export default function CanvasPage({
         </p>
       </div>
       {shared && shared.length > 1 && setPos && (
-        <SharedCanvas screens={shared} setPos={setPos} projectName={projectName ?? ""} />
+        <SharedCanvas screens={shared} setPos={setPos} projectName={projectName ?? ""} frameChoice={frameChoice} />
       )}
-      <StandardFrames screen={{ width: canvas.width, height: canvas.height }} all={combined} />
+      <StandardFrames screen={{ width: canvas.width, height: canvas.height }} all={combined} choice={frameChoice} setChoice={setFrameChoice} />
     </div>
   );
 }

@@ -62,3 +62,77 @@ export function fitText(f: FrameFit): string {
 
 /** The standard frame whose size matches exactly, if any. */
 export const exactFrame = (w: number, h: number) => videoFrames.find((f) => f.width === w && f.height === h) ?? null;
+
+// ---------------------------------------------------------------------------
+// Choosing the output canvas: a standard frame or a custom size, with the wall placed inside it.
+
+export type FrameAlign = "tl" | "center";
+export type FrameChoice = {
+  /** "wall" = just the wall's own size, "custom", or a standard frame id */
+  mode: string;
+  customW: number;
+  customH: number;
+  align: FrameAlign;
+};
+
+export const defaultFrameChoice: FrameChoice = { mode: "wall", customW: 1920, customH: 1080, align: "tl" };
+
+export type ChosenFrame = { width: number; height: number; name: string };
+
+/** The frame chosen, or null when the canvas is just the wall's own size. */
+export function chosenFrame(c: FrameChoice): ChosenFrame | null {
+  if (c.mode === "wall") return null;
+  if (c.mode === "custom") {
+    const w = Math.round(c.customW);
+    const h = Math.round(c.customH);
+    return w >= 16 && h >= 16 && w <= 16384 && h <= 16384 ? { width: w, height: h, name: `${w} x ${h}` } : null;
+  }
+  const f = videoFrames.find((x) => x.id === c.mode);
+  return f ? { width: f.width, height: f.height, name: f.name } : null;
+}
+
+/** Where the wall's top-left corner sits inside the frame, or null when it doesn't fit. */
+export function frameOffset(w: number, h: number, frame: { width: number; height: number }, align: FrameAlign) {
+  if (w > frame.width || h > frame.height) return null;
+  return align === "center"
+    ? { x: Math.floor((frame.width - w) / 2), y: Math.floor((frame.height - h) / 2) }
+    : { x: 0, y: 0 };
+}
+
+/** Put an SVG of the wall on a black frame of the chosen size. */
+export function wrapInFrame(svg: string, off: { x: number; y: number }, frame: { width: number; height: number }): string {
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${frame.width}" height="${frame.height}" viewBox="0 0 ${frame.width} ${frame.height}">` +
+    `<rect width="${frame.width}" height="${frame.height}" fill="#000"/>` +
+    svg.replace("<svg ", `<svg x="${off.x}" y="${off.y}" `) +
+    "</svg>"
+  );
+}
+
+const KEY = "pixelplan.canvas-frame";
+
+export function readFrameChoice(): FrameChoice {
+  try {
+    const o = JSON.parse(localStorage.getItem(KEY) || "null");
+    if (o && typeof o.mode === "string") {
+      const n = (v: unknown, d: number) => (typeof v === "number" && Number.isFinite(v) ? v : d);
+      return {
+        mode: o.mode,
+        customW: n(o.customW, defaultFrameChoice.customW),
+        customH: n(o.customH, defaultFrameChoice.customH),
+        align: o.align === "center" ? "center" : "tl",
+      };
+    }
+  } catch {
+    /* storage blocked or damaged: use the default */
+  }
+  return defaultFrameChoice;
+}
+
+export function storeFrameChoice(c: FrameChoice) {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(c));
+  } catch {
+    /* kept for this visit only */
+  }
+}

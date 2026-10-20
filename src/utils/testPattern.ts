@@ -398,8 +398,8 @@ export function downloadPatternSvg(p: PatternInput, name: string, svg: string = 
 /** Browsers refuse canvases past about 16,384 px a side or 268 million px in all. */
 const TOO_BIG_MSG = "This canvas is too large for the browser to turn into a PNG. Download the SVG instead, or split the wall into smaller screens.";
 
-export function downloadPatternPng(p: PatternInput, name: string, svg: string = testPatternSvg(p)) {
-  const { width, height } = p.canvas;
+export function downloadPatternPng(p: PatternInput, name: string, svg: string = testPatternSvg(p), size?: { width: number; height: number }) {
+  const { width, height } = size ?? p.canvas;
   if (width > 16384 || height > 16384 || width * height > 268_000_000) {
     window.alert(TOO_BIG_MSG);
     return;

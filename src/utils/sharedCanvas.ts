@@ -47,7 +47,8 @@ export function overlaps(placed: Placed[]): string[] {
   return out;
 }
 
-export function positionsCsv(placed: Placed[]) {
+export function positionsCsv(input: Placed[], frame: CanvasFrame | null = null) {
+  const { placed } = inFrame(input, frame);
   const rows = ["Screen,X,Y,Width,Height", ...placed.map((p) => `"${p.name.replace(/"/g, '""')}",${p.x},${p.y},${p.w},${p.h}`)];
   return rows.join("\n");
 }
@@ -56,8 +57,17 @@ export function positionsCsv(placed: Placed[]) {
  * One row per screen with the numbers a media server's slice editor asks for:
  * pixel rectangle, right and bottom edges, and the same rectangle as 0 to 1 fractions of the canvas.
  */
-export function slicesCsv(placed: Placed[]): string {
-  const { width, height } = bounds(placed);
+export type CanvasFrame = { width: number; height: number; x: number; y: number };
+
+/** Shift placed screens to where they sit inside a chosen frame, and report the frame's size. */
+export function inFrame(placed: Placed[], frame: CanvasFrame | null): { placed: Placed[]; width: number; height: number } {
+  const b = bounds(placed);
+  if (!frame) return { placed, width: b.width, height: b.height };
+  return { placed: placed.map((p) => ({ ...p, x: p.x + frame.x, y: p.y + frame.y })), width: frame.width, height: frame.height };
+}
+
+export function slicesCsv(input: Placed[], frame: CanvasFrame | null = null): string {
+  const { placed, width, height } = inFrame(input, frame);
   const f = (n: number, of: number) => (of > 0 ? (n / of).toFixed(6) : "0");
   const head = "Slice,X,Y,Width,Height,Right,Bottom,Left (0-1),Top (0-1),Width (0-1),Height (0-1)";
   const rows = placed.map((p) =>
@@ -70,8 +80,8 @@ export function slicesCsv(placed: Placed[]): string {
   return [head, ...rows, `"Canvas",0,0,${width},${height},${width},${height},0,0,1,1`].join("\n");
 }
 
-export function slicesJson(placed: Placed[]): string {
-  const { width, height } = bounds(placed);
+export function slicesJson(input: Placed[], frame: CanvasFrame | null = null): string {
+  const { placed, width, height } = inFrame(input, frame);
   return JSON.stringify(
     { canvas: { width, height }, slices: placed.map((p) => ({ name: p.name, x: p.x, y: p.y, width: p.w, height: p.h })) },
     null,

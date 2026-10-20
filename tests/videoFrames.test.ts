@@ -32,3 +32,34 @@ describe("standard video frames", () => {
     expect(frameReport(20000, 100).smallest).toBeNull();
   });
 });
+
+import { chosenFrame, frameOffset, wrapInFrame, defaultFrameChoice } from "../src/utils/videoFrames";
+import { slicesCsv, arrange } from "../src/utils/sharedCanvas";
+
+describe("choosing the canvas size", () => {
+  it("uses the wall's own size by default", () => {
+    expect(chosenFrame(defaultFrameChoice)).toBeNull();
+  });
+  it("finds a standard frame or a custom size", () => {
+    expect(chosenFrame({ ...defaultFrameChoice, mode: "uhd4k" })).toEqual({ width: 3840, height: 2160, name: "UHD 4K" });
+    expect(chosenFrame({ ...defaultFrameChoice, mode: "custom", customW: 2000, customH: 1000 })?.name).toBe("2000 x 1000");
+    expect(chosenFrame({ ...defaultFrameChoice, mode: "custom", customW: 4, customH: 1000 })).toBeNull();
+  });
+  it("places the wall top left or centred, and refuses when it does not fit", () => {
+    const f = { width: 3840, height: 2160 };
+    expect(frameOffset(2400, 1200, f, "tl")).toEqual({ x: 0, y: 0 });
+    expect(frameOffset(2400, 1200, f, "center")).toEqual({ x: 720, y: 480 });
+    expect(frameOffset(4000, 1200, f, "tl")).toBeNull();
+  });
+  it("wraps the wall in a frame of the chosen size", () => {
+    const svg = wrapInFrame('<svg xmlns="x" width="10" height="10"></svg>', { x: 5, y: 6 }, { width: 100, height: 50 });
+    expect(svg.startsWith('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="50"')).toBe(true);
+    expect(svg.includes('<svg x="5" y="6" xmlns="x"')).toBe(true);
+  });
+  it("shifts slices to where the wall sits in the frame", () => {
+    const placed = arrange([{ id: "a", name: "Main", w: 1000, h: 500, pos: null }]);
+    const lines = slicesCsv(placed, { width: 2000, height: 1000, x: 500, y: 250 }).split("\n");
+    expect(lines[1].startsWith('"Main",500,250,1000,500,1500,750,0.250000,0.250000,0.500000,0.500000')).toBe(true);
+    expect(lines[2]).toBe('"Canvas",0,0,2000,1000,2000,1000,0,0,1,1');
+  });
+});

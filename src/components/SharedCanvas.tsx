@@ -13,7 +13,9 @@ import {
   slicesJson,
   downloadJson,
   type CanvasItem,
+  type CanvasFrame,
 } from "../utils/sharedCanvas";
+import { chosenFrame, frameOffset, wrapInFrame, type FrameChoice } from "../utils/videoFrames";
 import { colourFor } from "./CabinetMap";
 import { Notice } from "./ui";
 
@@ -28,16 +30,26 @@ type Props = {
   screens: SharedScreen[];
   setPos: (id: string, pos: { x: number; y: number } | null) => void;
   projectName: string;
+  /** Canvas size chosen at the bottom of the page */
+  frameChoice: FrameChoice;
 };
 
 /** Every screen on one canvas, for a media server that drives them all from one output. */
-export default function SharedCanvas({ screens, setPos, projectName }: Props) {
+export default function SharedCanvas({ screens, setPos, projectName, frameChoice }: Props) {
   const items: CanvasItem[] = screens.map((s) => ({ id: s.id, name: s.name, w: s.pattern.canvas.width, h: s.pattern.canvas.height, pos: s.pos }));
   const placed = useMemo(() => arrange(items), [items.map((i) => `${i.id}:${i.w}x${i.h}:${i.pos?.x},${i.pos?.y}`).join("|")]); // eslint-disable-line react-hooks/exhaustive-deps
   const { width, height } = bounds(placed);
   const clash = overlaps(placed);
   const base = `${(projectName || "project").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-")}-combined-canvas`;
-  const build = () => combinedSvg(placed, new Map(screens.map((s) => [s.id, s.pattern])));
+  const chosen = chosenFrame(frameChoice);
+  const off = chosen ? frameOffset(width, height, chosen, frameChoice.align) : null;
+  const frame: CanvasFrame | null = chosen && off ? { width: chosen.width, height: chosen.height, ...off } : null;
+  const outW = frame?.width ?? width;
+  const outH = frame?.height ?? height;
+  const build = () => {
+    const svg = combinedSvg(placed, new Map(screens.map((s) => [s.id, s.pattern])));
+    return frame ? wrapInFrame(svg, frame, frame) : svg;
+  };
   const scale = 640 / Math.max(width, 1);
 
   return (
@@ -48,25 +60,25 @@ export default function SharedCanvas({ screens, setPos, projectName }: Props) {
           <button type="button" className="btn" onClick={() => screens.forEach((s) => setPos(s.id, null))}>
             Auto arrange
           </button>
-          <button type="button" className="btn" onClick={() => downloadCsv(positionsCsv(placed), base)}>
+          <button type="button" className="btn" onClick={() => downloadCsv(positionsCsv(placed, frame), base)}>
             Positions CSV
           </button>
-          <button type="button" className="btn" onClick={() => downloadCsv(slicesCsv(placed), `${base}-slices`)} title="Pixel and 0-1 values for a media server's slice or screen editor">
+          <button type="button" className="btn" onClick={() => downloadCsv(slicesCsv(placed, frame), `${base}-slices`)} title="Pixel and 0-1 values for a media server's slice or screen editor">
             Slices CSV
           </button>
-          <button type="button" className="btn" onClick={() => downloadJson(slicesJson(placed), `${base}-slices`)}>
+          <button type="button" className="btn" onClick={() => downloadJson(slicesJson(placed, frame), `${base}-slices`)}>
             Slices JSON
           </button>
           <button type="button" className="btn" onClick={() => downloadCombinedSvg(build(), base)}>
             SVG
           </button>
-          <button type="button" className="btn" onClick={() => downloadCombinedPng(build(), width, height, base)}>
+          <button type="button" className="btn" onClick={() => downloadCombinedPng(build(), outW, outH, base)}>
             PNG
           </button>
         </div>
       </div>
       <p className="mt-2 text-xs text-zinc-400">
-        Combined canvas is {width} x {height} px. Set each screen&apos;s X and Y to match where it sits in your media server&apos;s output. Screens without a position are packed left to right.
+        Combined canvas is {width} x {height} px{frame && chosen ? `, placed on a ${chosen.name} canvas for downloads` : ""}. Set each screen&apos;s X and Y to match where it sits in your media server&apos;s output. Screens without a position are packed left to right.
       </p>
 
       {clash.length > 0 && (
