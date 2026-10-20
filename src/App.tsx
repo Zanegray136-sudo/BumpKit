@@ -34,6 +34,7 @@ import { getCabinetLabel } from "./utils/cabinetLabels";
 import type { SharedScreen } from "./components/SharedCanvas";
 import ContentSettings from "./components/ContentSettings";
 import PowerDistro from "./components/PowerDistro";
+import { defaultCanvasSetup, type CanvasSetup } from "./utils/sharedCanvas";
 import { calcDistro, defaultDistro, type DistroSettings, type DistroCircuit } from "./utils/distro";
 import SizeSetup from "./components/SizeSetup";
 import ScreenTabs, { type ScreenTab } from "./components/ScreenTabs";
@@ -120,6 +121,7 @@ function App() {
   );
 
   const [distro, setDistro] = useState<DistroSettings>(initial.distro ?? defaultDistro);
+  const [canvasSetup, setCanvasSetup] = useState<CanvasSetup>(initial.canvasSetup ?? defaultCanvasSetup);
   const [pickSettings, setPickSettings] = useState<PickSettings>(initial.pickSettings);
   const [picked, setPicked] = useState<Record<string, boolean>>(initial.picked);
 
@@ -225,6 +227,7 @@ function App() {
     picked,
     customPanels,
     distro,
+    canvasSetup,
   });
 
   const [saveStatus, setSaveStatus] = useState("");
@@ -281,7 +284,7 @@ function App() {
     }, 600);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewing, screens, activeId, projectName, client, venue, engineer, revision, notes, pickSettings, picked, units, customPanels, distro]);
+  }, [viewing, screens, activeId, projectName, client, venue, engineer, revision, notes, pickSettings, picked, units, customPanels, distro, canvasSetup]);
 
   const load = (file: ProjectFile) => {
     setUnitsState(file.units);
@@ -298,6 +301,7 @@ function App() {
     setPicked(file.picked);
     setCustomPanelsState(file.customPanels);
     setDistro(file.distro);
+    setCanvasSetup(file.canvasSetup);
     setScreenTab("panel");
   };
   const newProject = () => {
@@ -664,6 +668,7 @@ function App() {
           id: x.id,
           name: x.name,
           pos: x.canvasPos,
+          canvas: x.canvasIndex,
           pattern: {
             canvas: core.canvasPlan,
             portOf: (r: number, k: number) => core.dataPlan.map[r]?.[k]?.port ?? 0,
@@ -959,7 +964,17 @@ function App() {
             toggles={toggles}
             setToggles={setToggles}
             shared={sharedScreens}
-            setPos={(id, pos) => setScreens((list) => list.map((x) => (x.id === id ? { ...x, canvasPos: pos } : x)))}
+            setLayout={(changes) =>
+              setScreens((list) =>
+                list.map((x) => {
+                  const c = changes.find((k) => k.id === x.id);
+                  if (!c) return x;
+                  return { ...x, ...(c.pos !== undefined ? { canvasPos: c.pos } : {}), ...(c.canvas !== undefined ? { canvasIndex: c.canvas } : {}) };
+                })
+              )
+            }
+            canvasSetup={canvasSetup}
+            setCanvasSetup={setCanvasSetup}
             projectName={projectName}
           />
         ) : null

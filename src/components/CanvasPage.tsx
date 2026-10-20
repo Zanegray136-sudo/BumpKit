@@ -16,7 +16,7 @@ import {
 } from "../utils/testPattern";
 import SharedCanvas, { type SharedScreen } from "./SharedCanvas";
 import StandardFrames from "./StandardFrames";
-import { arrange, bounds, type CanvasFrame } from "../utils/sharedCanvas";
+import type { CanvasFrame, CanvasSetup } from "../utils/sharedCanvas";
 import { chosenFrame, placeWall, readFrameChoice, storeFrameChoice, wrapInFrame, type FrameChoice } from "../utils/videoFrames";
 import { ModeSwitchGeneric, Select, Stat } from "./ui";
 
@@ -43,7 +43,9 @@ export default function CanvasPage({
   toggles,
   setToggles,
   shared,
-  setPos,
+  setLayout,
+  canvasSetup,
+  setCanvasSetup,
   projectName,
 }: {
   canvas: CanvasPlan;
@@ -58,16 +60,13 @@ export default function CanvasPage({
   setToggles: (t: PatternToggles) => void;
   /** Every screen, when the project has more than one */
   shared?: SharedScreen[];
-  setPos?: (id: string, pos: { x: number; y: number } | null) => void;
+  setLayout?: (changes: { id: string; pos?: { x: number; y: number } | null; canvas?: number | null }[]) => void;
+  canvasSetup?: CanvasSetup;
+  setCanvasSetup?: (s: CanvasSetup) => void;
   projectName?: string;
 }) {
   const shown = title.trim() || fallbackTitle;
   const [view, setView] = useState("pattern");
-  // Size of every screen's canvas together, laid out the same way as the combined canvas below.
-  const combined = useMemo(() => {
-    if (!shared || shared.length < 2) return null;
-    return bounds(arrange(shared.map((x) => ({ id: x.id, name: x.name, w: x.pattern.canvas.width, h: x.pattern.canvas.height, pos: x.pos }))));
-  }, [shared]);
   // The canvas size the person chose for downloads (a standard frame, a custom size, or just the wall).
   const [frameChoice, setFrameChoiceState] = useState<FrameChoice>(readFrameChoice);
   const setFrameChoice = (c: FrameChoice) => {
@@ -301,10 +300,10 @@ export default function CanvasPage({
           A port area is the smallest box around its cabinets. Snaking or custom ports can overlap the boxes of their neighbours.
         </p>
       </div>
-      {shared && shared.length > 1 && setPos && (
-        <SharedCanvas screens={shared} setPos={setPos} projectName={projectName ?? ""} frameChoice={frameChoice} />
+      <StandardFrames screen={{ width: canvas.width, height: canvas.height }} choice={frameChoice} setChoice={setFrameChoice} />
+      {shared && shared.length > 1 && setLayout && canvasSetup && setCanvasSetup && (
+        <SharedCanvas screens={shared} setLayout={setLayout} setup={canvasSetup} setSetup={setCanvasSetup} projectName={projectName ?? ""} />
       )}
-      <StandardFrames screen={{ width: canvas.width, height: canvas.height }} all={combined} choice={frameChoice} setChoice={setFrameChoice} />
     </div>
   );
 }

@@ -5,6 +5,8 @@ import { defaultToggles } from "./testPattern";
 import type { Units } from "./units";
 import { defaultContent, type Content } from "./content";
 import { defaultDistro, type DistroSettings } from "./distro";
+import { clampCount, defaultCanvasSetup, MAX_CANVASES, type CanvasSetup } from "./sharedCanvas";
+import { videoFrames } from "./videoFrames";
 import { defaultCurve } from "./curve";
 import type { LedPanel } from "../data/ledPanels";
 import { newScreenState, type ScreenState } from "./screenModel";
@@ -31,6 +33,8 @@ export type ProjectFile = {
   /** Cabinets the person added that aren't in the built-in list */
   customPanels: LedPanel[];
   distro: DistroSettings;
+  /** How many canvases the screens are laid out on, and how big they are */
+  canvasSetup: CanvasSetup;
 };
 
 export const emptyProject = (): ProjectFile => ({
@@ -45,6 +49,7 @@ export const emptyProject = (): ProjectFile => ({
   picked: {},
   customPanels: [],
   distro: defaultDistro,
+  canvasSetup: defaultCanvasSetup,
 });
 
 const STORAGE_KEY = "open-av-toolkit.project";
@@ -76,6 +81,13 @@ const cleanPanels = (v: unknown): LedPanel[] => {
     });
   }
   return out;
+};
+
+const cleanCanvasSetup = (v: unknown): CanvasSetup => {
+  const o = isObj(v) ? v : {};
+  const num = (x: unknown, d: number) => (typeof x === "number" && Number.isFinite(x) ? Math.max(16, Math.min(16384, Math.round(x))) : d);
+  const mode = typeof o.mode === "string" && (o.mode === "fit" || o.mode === "custom" || videoFrames.some((f) => f.id === o.mode)) ? o.mode : "fit";
+  return { count: clampCount(typeof o.count === "number" ? o.count : 1), mode, customW: num(o.customW, defaultCanvasSetup.customW), customH: num(o.customH, defaultCanvasSetup.customH) };
 };
 
 const cleanNames = (v: unknown): Record<string, string> => {
@@ -145,6 +157,8 @@ function cleanScreen(raw: unknown, index: number): ScreenState | null {
       isObj(raw.canvasPos) && typeof raw.canvasPos.x === "number" && typeof raw.canvasPos.y === "number"
         ? { x: Math.max(0, Math.round(raw.canvasPos.x)), y: Math.max(0, Math.round(raw.canvasPos.y)) }
         : null,
+    canvasIndex:
+      typeof raw.canvasIndex === "number" && Number.isFinite(raw.canvasIndex) ? Math.max(0, Math.min(MAX_CANVASES - 1, Math.round(raw.canvasIndex))) : null,
     rowScale: scaleList(raw.rowScale),
     colScale: scaleList(raw.colScale),
   };
@@ -180,6 +194,7 @@ export function parseProject(text: string): ProjectFile | null {
       screens,
       customPanels: cleanPanels(raw.customPanels),
       distro: cleanDistro(raw.distro),
+      canvasSetup: cleanCanvasSetup(raw.canvasSetup),
       activeId: screens.some((s) => s.id === raw.activeId) ? (raw.activeId as string) : screens[0].id,
       pickSettings: {
         ...defaultPickSettings,

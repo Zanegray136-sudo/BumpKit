@@ -34,7 +34,6 @@ describe("standard video frames", () => {
 });
 
 import { chosenFrame, frameOffset, wrapInFrame, defaultFrameChoice } from "../src/utils/videoFrames";
-import { slicesCsv, arrange } from "../src/utils/sharedCanvas";
 
 describe("choosing the canvas size", () => {
   it("uses the wall's own size by default", () => {
@@ -55,12 +54,6 @@ describe("choosing the canvas size", () => {
     const svg = wrapInFrame('<svg xmlns="x" width="10" height="10"></svg>', { x: 5, y: 6 }, { width: 100, height: 50 });
     expect(svg.startsWith('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="50"')).toBe(true);
     expect(svg.includes('<svg x="5" y="6" xmlns="x"')).toBe(true);
-  });
-  it("shifts slices to where the wall sits in the frame", () => {
-    const placed = arrange([{ id: "a", name: "Main", w: 1000, h: 500, pos: null }]);
-    const lines = slicesCsv(placed, { width: 2000, height: 1000, x: 500, y: 250 }).split("\n");
-    expect(lines[1].startsWith('"Main",500,250,1000,500,1500,750,0.250000,0.250000,0.500000,0.500000')).toBe(true);
-    expect(lines[2]).toBe('"Canvas",0,0,2000,1000,2000,1000,0,0,1,1');
   });
 });
 

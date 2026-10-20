@@ -46,6 +46,8 @@ export type ScreenState = {
   content: Content;
   /** Where this screen sits on the combined canvas, null = packed automatically */
   canvasPos: { x: number; y: number } | null;
+  /** Which canvas it is on when the project has several (0 is the first), null = chosen automatically */
+  canvasIndex: number | null;
 };
 
 export const newScreenState = (id: string, name: string): ScreenState => ({
@@ -73,6 +75,7 @@ export const newScreenState = (id: string, name: string): ScreenState => ({
   colScale: [],
   content: defaultContent,
   canvasPos: null,
+  canvasIndex: null,
 });
 
 export type ProjectContext = {
