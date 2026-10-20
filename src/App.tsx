@@ -53,6 +53,8 @@ import { fmtKg, setUnits, type Units } from "./utils/units";
 import { canShare, makeShareUrl } from "./utils/shareLink";
 import TemplatePicker from "./components/TemplatePicker";
 import WelcomeCard from "./components/WelcomeCard";
+import ThemeSetting from "./components/ThemeSetting";
+import { applyTheme, readTheme, setTheme, watchSystemTheme } from "./utils/theme";
 import { templates } from "./data/templates";
 import { templateScreens } from "./data/templates";
 import ProjectToolbar from "./components/ProjectToolbar";
@@ -582,6 +584,10 @@ function App() {
   }, [page, screens, revision, projectName, client, venue, engineer, notes, pickLists, pickItems, units, cableRows, pickSettings.currency, pickSettings.days, distroPlan, distro, changesKey]);
 
   const install = useInstall();
+  useEffect(() => {
+    applyTheme(readTheme());
+    watchSystemTheme();
+  }, []);
 
   const checks = useMemo(() => {
     const list = screens.map((x, i) => buildScreenReport(x, all[i], ctx, pickLists[i]));
@@ -623,6 +629,8 @@ function App() {
       { id: "save", label: "Save project file", group: "Action", run: () => saveFile() },
       ...(install ? [{ id: "install", label: "Install the app", group: "Action", run: install }] : []),
       { id: "units-m", label: "Show metric units", group: "Action", run: () => setUnitsState("metric") },
+      { id: "theme-dark", label: "Use the dark theme", group: "Action", run: () => setTheme("dark") },
+      { id: "theme-light", label: "Use the light theme", group: "Action", run: () => setTheme("light") },
       { id: "units-i", label: "Show imperial units", group: "Action", run: () => setUnitsState("imperial") },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -745,6 +753,7 @@ function App() {
           />
         </RevisionHistory>
         <ProcessorSharing plan={sharing} />
+        <ThemeSetting />
         </div>
       );
       break;

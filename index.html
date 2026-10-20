@@ -9,6 +9,18 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="theme-color" content="#171b1e" />
+    <script>
+      (function () {
+        try {
+          var c = localStorage.getItem("pixelplan.theme");
+          var light = c === "light" || (c === "system" && window.matchMedia("(prefers-color-scheme: light)").matches);
+          if (light) {
+            document.documentElement.setAttribute("data-theme", "light");
+            document.querySelector('meta[name="theme-color"]').setAttribute("content", "#f3f5f7");
+          }
+        } catch (e) {}
+      })();
+    </script>
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
