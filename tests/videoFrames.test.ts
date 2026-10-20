@@ -63,3 +63,24 @@ describe("choosing the canvas size", () => {
     expect(lines[2]).toBe('"Canvas",0,0,2000,1000,2000,1000,0,0,1,1');
   });
 });
+
+import { clampOffset, snapOffset, placeWall } from "../src/utils/videoFrames";
+
+describe("dragging the wall in the frame", () => {
+  const frame = { width: 3840, height: 2160 };
+  it("keeps the wall inside the frame", () => {
+    expect(clampOffset({ x: -50, y: 5000 }, 2400, 1200, frame)).toEqual({ x: 0, y: 960 });
+  });
+  it("snaps to the edges and the centre", () => {
+    expect(snapOffset({ x: 6, y: 478 }, 2400, 1200, frame, 8)).toEqual({ x: 0, y: 480 });
+    expect(snapOffset({ x: 300, y: 300 }, 2400, 1200, frame, 8)).toEqual({ x: 300, y: 300 });
+    expect(snapOffset({ x: 1436, y: 0 }, 2400, 1200, frame, 8)).toEqual({ x: 1440, y: 0 });
+  });
+  it("uses a dragged position over the alignment", () => {
+    const c = { ...defaultFrameChoice, mode: "uhd4k", align: "center" as const, pos: { x: 100, y: 200 } };
+    const p = placeWall(c, 2400, 1200)!;
+    expect([p.x, p.y]).toEqual([100, 200]);
+    const centred = placeWall({ ...c, pos: null }, 2400, 1200)!;
+    expect([centred.x, centred.y]).toEqual([720, 480]);
+  });
+});

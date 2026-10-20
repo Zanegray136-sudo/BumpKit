@@ -1,3 +1,4 @@
+import { canvasToPng } from "./pngEncode";
 import { testPatternSvg, type PatternInput } from "./testPattern";
 
 export type CanvasItem = {
@@ -129,7 +130,7 @@ export function downloadCombinedPng(svg: string, width: number, height: number, 
     if (!ctx) return;
     ctx.drawImage(img, 0, 0, width, height);
     URL.revokeObjectURL(url);
-    canvas.toBlob((b) => b && save(b, `${name}.png`), "image/png");
+    void canvasToPng(canvas).then((b) => b && save(b, `${name}.png`));
   };
   img.src = url;
 }

@@ -15,7 +15,7 @@ import {
   type CanvasItem,
   type CanvasFrame,
 } from "../utils/sharedCanvas";
-import { chosenFrame, frameOffset, wrapInFrame, type FrameChoice } from "../utils/videoFrames";
+import { chosenFrame, placeWall, wrapInFrame, type FrameChoice } from "../utils/videoFrames";
 import { colourFor } from "./CabinetMap";
 import { Notice } from "./ui";
 
@@ -42,8 +42,8 @@ export default function SharedCanvas({ screens, setPos, projectName, frameChoice
   const clash = overlaps(placed);
   const base = `${(projectName || "project").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-")}-combined-canvas`;
   const chosen = chosenFrame(frameChoice);
-  const off = chosen ? frameOffset(width, height, chosen, frameChoice.align) : null;
-  const frame: CanvasFrame | null = chosen && off ? { width: chosen.width, height: chosen.height, ...off } : null;
+  const put = placeWall(frameChoice, width, height);
+  const frame: CanvasFrame | null = put ? { width: put.frame.width, height: put.frame.height, x: put.x, y: put.y } : null;
   const outW = frame?.width ?? width;
   const outH = frame?.height ?? height;
   const build = () => {

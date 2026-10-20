@@ -73,9 +73,11 @@ export type FrameChoice = {
   customW: number;
   customH: number;
   align: FrameAlign;
+  /** Where the person dragged the wall to, in frame pixels. Null = use the alignment. */
+  pos: { x: number; y: number } | null;
 };
 
-export const defaultFrameChoice: FrameChoice = { mode: "wall", customW: 1920, customH: 1080, align: "tl" };
+export const defaultFrameChoice: FrameChoice = { mode: "wall", customW: 1920, customH: 1080, align: "tl", pos: null };
 
 export type ChosenFrame = { width: number; height: number; name: string };
 
@@ -92,11 +94,46 @@ export function chosenFrame(c: FrameChoice): ChosenFrame | null {
 }
 
 /** Where the wall's top-left corner sits inside the frame, or null when it doesn't fit. */
-export function frameOffset(w: number, h: number, frame: { width: number; height: number }, align: FrameAlign) {
+export function frameOffset(
+  w: number,
+  h: number,
+  frame: { width: number; height: number },
+  align: FrameAlign,
+  pos: { x: number; y: number } | null = null
+) {
   if (w > frame.width || h > frame.height) return null;
+  if (pos) return clampOffset(pos, w, h, frame);
   return align === "center"
     ? { x: Math.floor((frame.width - w) / 2), y: Math.floor((frame.height - h) / 2) }
     : { x: 0, y: 0 };
+}
+
+/** Keep a position inside the frame, on whole pixels. */
+export function clampOffset(pos: { x: number; y: number }, w: number, h: number, frame: { width: number; height: number }) {
+  return {
+    x: Math.max(0, Math.min(frame.width - w, Math.round(pos.x))),
+    y: Math.max(0, Math.min(frame.height - h, Math.round(pos.y))),
+  };
+}
+
+/** The frame and wall position for a canvas of w x h under the person's choice, or null if it doesn't fit. */
+export function placeWall(c: FrameChoice, w: number, h: number) {
+  const frame = chosenFrame(c);
+  if (!frame) return null;
+  const off = frameOffset(w, h, frame, c.align, c.pos);
+  return off ? { frame, ...off } : null;
+}
+
+/** Snap a position to the frame's edges and centre lines when within `tol` pixels. */
+export function snapOffset(pos: { x: number; y: number }, w: number, h: number, frame: { width: number; height: number }, tol: number) {
+  const snap = (v: number, targets: number[]) => {
+    const hit = targets.find((t) => Math.abs(v - t) <= tol);
+    return hit ?? v;
+  };
+  return {
+    x: snap(pos.x, [0, Math.round((frame.width - w) / 2), frame.width - w]),
+    y: snap(pos.y, [0, Math.round((frame.height - h) / 2), frame.height - h]),
+  };
 }
 
 /** Put an SVG of the wall on a black frame of the chosen size. */
@@ -121,6 +158,7 @@ export function readFrameChoice(): FrameChoice {
         customW: n(o.customW, defaultFrameChoice.customW),
         customH: n(o.customH, defaultFrameChoice.customH),
         align: o.align === "center" ? "center" : "tl",
+        pos: o.pos && Number.isFinite(o.pos.x) && Number.isFinite(o.pos.y) ? { x: Math.round(o.pos.x), y: Math.round(o.pos.y) } : null,
       };
     }
   } catch {

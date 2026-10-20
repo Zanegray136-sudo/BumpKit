@@ -17,7 +17,7 @@ import {
 import SharedCanvas, { type SharedScreen } from "./SharedCanvas";
 import StandardFrames from "./StandardFrames";
 import { arrange, bounds, type CanvasFrame } from "../utils/sharedCanvas";
-import { chosenFrame, frameOffset, readFrameChoice, storeFrameChoice, wrapInFrame, type FrameChoice } from "../utils/videoFrames";
+import { chosenFrame, placeWall, readFrameChoice, storeFrameChoice, wrapInFrame, type FrameChoice } from "../utils/videoFrames";
 import { ModeSwitchGeneric, Select, Stat } from "./ui";
 
 const chips: [keyof PatternToggles, string][] = [
@@ -74,13 +74,9 @@ export default function CanvasPage({
     setFrameChoiceState(c);
     storeFrameChoice(c);
   };
-  const frame = chosenFrame(frameChoice);
-  const frameFor = (w: number, h: number): CanvasFrame | null => {
-    if (!frame) return null;
-    const off = frameOffset(w, h, frame, frameChoice.align);
-    return off ? { width: frame.width, height: frame.height, ...off } : null;
-  };
-  const screenFrame = frameFor(canvas.width, canvas.height);
+  const placed = placeWall(frameChoice, canvas.width, canvas.height);
+  const frame = placed?.frame ?? chosenFrame(frameChoice);
+  const screenFrame: CanvasFrame | null = placed ? { width: placed.frame.width, height: placed.frame.height, x: placed.x, y: placed.y } : null;
   const aspect = canvas.height > 0 ? canvas.width / canvas.height : 0;
 
   const input: PatternInput = {

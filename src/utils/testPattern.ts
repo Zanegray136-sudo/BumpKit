@@ -1,5 +1,6 @@
 import { colourFor } from "../components/CabinetMap";
 import type { CanvasPlan } from "./canvas";
+import { canvasToPng } from "./pngEncode";
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -417,7 +418,7 @@ export function downloadPatternPng(p: PatternInput, name: string, svg: string = 
       return;
     }
     ctx.drawImage(img, 0, 0, width, height);
-    canvas.toBlob((b) => (b ? save(b, `${name}.png`) : window.alert(TOO_BIG_MSG)), "image/png");
+    void canvasToPng(canvas).then((b) => (b ? save(b, `${name}.png`) : window.alert(TOO_BIG_MSG)));
   };
   img.onerror = () => {
     URL.revokeObjectURL(url);
