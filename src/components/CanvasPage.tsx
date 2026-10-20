@@ -1,4 +1,3 @@
-import StandardFrames from "./StandardFrames";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import CanvasView from "./CanvasView";
 import { colourFor } from "./CabinetMap";
@@ -16,6 +15,8 @@ import {
   type PatternToggles,
 } from "../utils/testPattern";
 import SharedCanvas, { type SharedScreen } from "./SharedCanvas";
+import StandardFrames from "./StandardFrames";
+import { arrange, bounds } from "../utils/sharedCanvas";
 import { ModeSwitchGeneric, Select, Stat } from "./ui";
 
 const chips: [keyof PatternToggles, string][] = [
@@ -61,6 +62,11 @@ export default function CanvasPage({
 }) {
   const shown = title.trim() || fallbackTitle;
   const [view, setView] = useState("pattern");
+  // Size of every screen's canvas together, laid out the same way as the combined canvas below.
+  const combined = useMemo(() => {
+    if (!shared || shared.length < 2) return null;
+    return bounds(arrange(shared.map((x) => ({ id: x.id, name: x.name, w: x.pattern.canvas.width, h: x.pattern.canvas.height, pos: x.pos }))));
+  }, [shared]);
   const aspect = canvas.height > 0 ? canvas.width / canvas.height : 0;
 
   const input: PatternInput = {
@@ -126,8 +132,6 @@ export default function CanvasPage({
         <Stat label="Lit pixels" value={canvas.litPixels.toLocaleString()} />
         <Stat label="Ports on canvas" value={String(canvas.ports.length)} />
       </div>
-
-      <StandardFrames width={canvas.width} height={canvas.height} label="This screen's canvas" />
 
       <div className="panel">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
@@ -278,6 +282,7 @@ export default function CanvasPage({
       {shared && shared.length > 1 && setPos && (
         <SharedCanvas screens={shared} setPos={setPos} projectName={projectName ?? ""} />
       )}
+      <StandardFrames screen={{ width: canvas.width, height: canvas.height }} all={combined} />
     </div>
   );
 }

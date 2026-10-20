@@ -1,13 +1,40 @@
+import { useState } from "react";
+import { ModeSwitchGeneric } from "./ui";
 import { fitText, frameReport, exactFrame } from "../utils/videoFrames";
 
 /** How a canvas compares with the standard video frames a media server outputs. */
-export default function StandardFrames({ width, height, label = "Canvas" }: { width: number; height: number; label?: string }) {
+export default function StandardFrames({
+  screen,
+  all,
+}: {
+  /** The screen being looked at */
+  screen: { width: number; height: number };
+  /** Every screen on one canvas, when the project has more than one */
+  all?: { width: number; height: number } | null;
+}) {
+  const [scope, setScope] = useState<"screen" | "all">("screen");
+  const useAll = scope === "all" && !!all;
+  const { width, height } = useAll ? all! : screen;
+  const label = useAll ? "The combined canvas of all screens" : all ? "This screen's canvas" : "The canvas";
   if (width <= 0 || height <= 0) return null;
   const { fits, smallest } = frameReport(width, height);
   const exact = exactFrame(width, height);
   return (
     <div className="panel">
-      <h2 className="panel-title">Standard video frames</h2>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 pb-3">
+        <h2 className="text-[15px] font-semibold text-zinc-50">Standard video frames</h2>
+        {all && (
+          <ModeSwitchGeneric
+            label="Check"
+            value={scope}
+            onChange={(v) => setScope(v as "screen" | "all")}
+            options={[
+              { value: "screen", label: "This screen" },
+              { value: "all", label: "All screens" },
+            ]}
+          />
+        )}
+      </div>
       <p className="mb-3 text-sm text-zinc-300">
         {label} is {width} x {height} px.{" "}
         {exact

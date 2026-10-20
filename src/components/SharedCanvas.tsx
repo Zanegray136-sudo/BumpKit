@@ -16,7 +16,6 @@ import {
 } from "../utils/sharedCanvas";
 import { colourFor } from "./CabinetMap";
 import { Notice } from "./ui";
-import StandardFrames from "./StandardFrames";
 
 export type SharedScreen = {
   id: string;
@@ -42,7 +41,6 @@ export default function SharedCanvas({ screens, setPos, projectName }: Props) {
   const scale = 640 / Math.max(width, 1);
 
   return (
-    <>
     <div className="panel">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="panel-title !mb-0">All screens on one canvas</h2>
@@ -129,7 +127,5 @@ export default function SharedCanvas({ screens, setPos, projectName }: Props) {
         </table>
       </div>
     </div>
-    <StandardFrames width={width} height={height} label="The combined canvas" />
-    </>
   );
 }
