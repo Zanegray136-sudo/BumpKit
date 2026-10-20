@@ -1,3 +1,4 @@
+import StandardFrames from "./StandardFrames";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import CanvasView from "./CanvasView";
 import { colourFor } from "./CabinetMap";
@@ -125,6 +126,8 @@ export default function CanvasPage({
         <Stat label="Lit pixels" value={canvas.litPixels.toLocaleString()} />
         <Stat label="Ports on canvas" value={String(canvas.ports.length)} />
       </div>
+
+      <StandardFrames width={canvas.width} height={canvas.height} label="This screen's canvas" />
 
       <div className="panel">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
