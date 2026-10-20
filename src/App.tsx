@@ -24,6 +24,8 @@ import ProcessorPicker from "./components/ProcessorPicker";
 import ProcessorInfo from "./components/ProcessorInfo";
 import ViewingDistance from "./components/ViewingDistance";
 import { calcViewing } from "./utils/viewing";
+import { backupState, fingerprint, loadRecord, recordSave, storeRecord, trackChange } from "./utils/backup";
+import BackupReminder from "./components/BackupReminder";
 import CurveSetup from "./components/CurveSetup";
 import MixedSizes from "./components/MixedSizes";
 import TargetSize from "./components/TargetSize";
@@ -221,12 +223,50 @@ function App() {
 
   const [saveStatus, setSaveStatus] = useState("");
   const [viewing, setViewing] = useState(sharedAtStart !== null);
+  // After opening a file or starting fresh, the next autosave becomes the "nothing unsaved" baseline.
+  const rebase = useRef(false);
+  // Has a project file been saved since the last change? (separate from the browser autosave)
+  const blankPrint = useMemo(() => fingerprint(emptyProject()), []);
+  const [backup, setBackup] = useState(loadRecord);
+  const [now, setNow] = useState(() => Date.now());
+  const [snoozedAt, setSnoozedAt] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(t);
+  }, []);
+  const backupInfo = backupState(backup, now);
+  const saveFile = () => {
+    const snap = snapshot();
+    downloadProject(snap);
+    const rec = recordSave(fingerprint(snap), Date.now());
+    storeRecord(rec);
+    setBackup(rec);
+    setSnoozedAt(0);
+  };
+  // Warn before the tab closes with changes no file has.
+  useEffect(() => {
+    if (!backupInfo.unsaved || viewing) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [backupInfo.unsaved, viewing]);
   useEffect(() => {
     // A shared project is only kept if the person chooses to keep it.
     if (viewing) return;
     // Keep a copy in the browser a moment after each change.
     const timer = setTimeout(() => {
-      const ok = saveLocal(snapshot());
+      const snap = snapshot();
+      const ok = saveLocal(snap);
+      setBackup((rec) => {
+        const print = fingerprint(snap);
+        const next = rebase.current ? recordSave(print, Date.now()) : trackChange(rec, print, blankPrint, Date.now());
+        rebase.current = false;
+        if (next !== rec) storeRecord(next);
+        return next;
+      });
       setSaveStatus(
         ok
           ? `Autosaved ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
@@ -257,6 +297,7 @@ function App() {
   const newProject = () => {
     if (!window.confirm("Start a new project? Save a file first if you want to keep this one.")) return;
     clearSaved();
+    rebase.current = true;
     load(emptyProject());
   };
   const openFile = (file: File) =>
@@ -268,6 +309,7 @@ function App() {
           window.alert("That file isn't a PixelPlan project.");
           return;
         }
+        rebase.current = true;
         load(parsed);
       })
       .catch(() => window.alert("That file couldn't be read."));
@@ -576,7 +618,7 @@ function App() {
       { id: "redo", label: "Redo", group: "Action", hint: "Ctrl Shift Z", run: redo },
       { id: "add-screen", label: "Add a screen", group: "Action", run: () => addScreen() },
       { id: "dup-screen", label: "Duplicate this screen", group: "Action", run: () => addScreen(st) },
-      { id: "save", label: "Save project file", group: "Action", run: () => downloadProject(snapshot()) },
+      { id: "save", label: "Save project file", group: "Action", run: () => saveFile() },
       ...(install ? [{ id: "install", label: "Install the app", group: "Action", run: install }] : []),
       { id: "units-m", label: "Show metric units", group: "Action", run: () => setUnitsState("metric") },
       { id: "units-i", label: "Show imperial units", group: "Action", run: () => setUnitsState("imperial") },
@@ -1059,6 +1101,9 @@ function App() {
         />
 
         <main className="p-4 sm:p-6 pb-24 lg:pb-6 max-w-[1400px]">
+          {!viewing && backupInfo.remind && now - snoozedAt > 30 * 60 * 1000 && (
+            <BackupReminder minutes={backupInfo.minutes} onSave={saveFile} onLater={() => setSnoozedAt(Date.now())} />
+          )}
           {viewing && (
             <SharedBanner
               hasOwn={loadSaved() !== null}
@@ -1079,7 +1124,7 @@ function App() {
             onUndo={undo}
             onRedo={redo}
             onNew={newProject}
-            onSave={() => downloadProject(snapshot())}
+            onSave={saveFile}
             onShare={
               canShare()
                 ? () =>
