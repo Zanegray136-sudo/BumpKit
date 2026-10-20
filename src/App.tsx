@@ -714,6 +714,13 @@ function App() {
               processor: x.processor,
               processors: all[i].processorsRequired,
               overloaded: all[i].overloaded,
+              spec: !all[i].selectedPanel
+                ? "none"
+                : !all[i].selectedPanel!.specSource
+                ? "unverified"
+                : all[i].selectedPanel!.powerEstimated
+                ? "estimated"
+                : "verified",
             }))}
             checks={checks}
             onOpen={(id) => {

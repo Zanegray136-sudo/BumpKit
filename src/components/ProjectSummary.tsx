@@ -16,6 +16,8 @@ export type SummaryRow = {
   processor: string;
   processors: number;
   overloaded: boolean;
+  /** How far the cabinet figures can be trusted */
+  spec: "verified" | "estimated" | "unverified" | "none";
 };
 
 /** Whole-project totals and a row per screen. */
@@ -64,6 +66,7 @@ export default function ProjectSummary({
               <th className="py-1.5 pr-3 font-medium">Resolution</th>
               <th className="py-1.5 pr-3 font-medium">Cabinets</th>
               <th className="py-1.5 pr-3 font-medium">Processor</th>
+              <th className="py-1.5 pr-3 font-medium">Specs</th>
               <th className="py-1.5 pr-3 font-medium">Power</th>
               <th className="py-1.5 font-medium">Weight</th>
             </tr>
@@ -82,6 +85,17 @@ export default function ProjectSummary({
                 <td className="py-2 pr-3">{r.cabinets || "-"}</td>
                 <td className={`py-2 pr-3 ${r.overloaded ? "text-red-300" : ""}`}>
                   {r.processor ? `${r.processors > 1 ? `${r.processors} x ` : ""}${r.processor}` : "-"}
+                </td>
+                <td className="py-2 pr-3 whitespace-nowrap">
+                  {r.spec === "none" ? "-" : (
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-[10px] ${
+                        r.spec === "verified" ? "bg-emerald-900/50 text-emerald-200" : "bg-amber-900/50 text-amber-200"
+                      }`}
+                    >
+                      {r.spec === "verified" ? "verified" : r.spec === "estimated" ? "power est." : "unverified"}
+                    </span>
+                  )}
                 </td>
                 <td className="py-2 pr-3 whitespace-nowrap">{r.cabinets ? `${(r.watts / 1000).toFixed(2)} kW` : "-"}</td>
                 <td className="py-2 whitespace-nowrap">{r.cabinets ? fmtKg(r.kg) : "-"}</td>
