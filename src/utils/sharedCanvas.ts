@@ -52,6 +52,33 @@ export function positionsCsv(placed: Placed[]) {
   return rows.join("\n");
 }
 
+/**
+ * One row per screen with the numbers a media server's slice editor asks for:
+ * pixel rectangle, right and bottom edges, and the same rectangle as 0 to 1 fractions of the canvas.
+ */
+export function slicesCsv(placed: Placed[]): string {
+  const { width, height } = bounds(placed);
+  const f = (n: number, of: number) => (of > 0 ? (n / of).toFixed(6) : "0");
+  const head = "Slice,X,Y,Width,Height,Right,Bottom,Left (0-1),Top (0-1),Width (0-1),Height (0-1)";
+  const rows = placed.map((p) =>
+    [
+      `"${p.name.replace(/"/g, '""')}"`,
+      p.x, p.y, p.w, p.h, p.x + p.w, p.y + p.h,
+      f(p.x, width), f(p.y, height), f(p.w, width), f(p.h, height),
+    ].join(",")
+  );
+  return [head, ...rows, `"Canvas",0,0,${width},${height},${width},${height},0,0,1,1`].join("\n");
+}
+
+export function slicesJson(placed: Placed[]): string {
+  const { width, height } = bounds(placed);
+  return JSON.stringify(
+    { canvas: { width, height }, slices: placed.map((p) => ({ name: p.name, x: p.x, y: p.y, width: p.w, height: p.h })) },
+    null,
+    2
+  );
+}
+
 /** One SVG with every screen's test pattern placed at its position. */
 export function combinedSvg(placed: Placed[], patterns: Map<string, PatternInput>): string {
   const { width, height } = bounds(placed);
@@ -78,6 +105,7 @@ function save(blob: Blob, name: string) {
 }
 
 export const downloadCombinedSvg = (svg: string, name: string) => save(new Blob([svg], { type: "image/svg+xml" }), `${name}.svg`);
+export const downloadJson = (text: string, name: string) => save(new Blob([text], { type: "application/json" }), `${name}.json`);
 export const downloadCsv = (csv: string, name: string) => save(new Blob([csv], { type: "text/csv" }), `${name}.csv`);
 
 export function downloadCombinedPng(svg: string, width: number, height: number, name: string) {

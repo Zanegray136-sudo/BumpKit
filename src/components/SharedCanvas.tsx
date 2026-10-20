@@ -9,6 +9,9 @@ import {
   downloadCsv,
   overlaps,
   positionsCsv,
+  slicesCsv,
+  slicesJson,
+  downloadJson,
   type CanvasItem,
 } from "../utils/sharedCanvas";
 import { colourFor } from "./CabinetMap";
@@ -47,6 +50,12 @@ export default function SharedCanvas({ screens, setPos, projectName }: Props) {
           </button>
           <button type="button" className="btn" onClick={() => downloadCsv(positionsCsv(placed), base)}>
             Positions CSV
+          </button>
+          <button type="button" className="btn" onClick={() => downloadCsv(slicesCsv(placed), `${base}-slices`)} title="Pixel and 0-1 values for a media server's slice or screen editor">
+            Slices CSV
+          </button>
+          <button type="button" className="btn" onClick={() => downloadJson(slicesJson(placed), `${base}-slices`)}>
+            Slices JSON
           </button>
           <button type="button" className="btn" onClick={() => downloadCombinedSvg(build(), base)}>
             SVG
