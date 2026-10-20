@@ -3,7 +3,7 @@ import { templates, type Template } from "../data/templates";
 /** Start a project from a common setup. */
 export default function TemplatePicker({ onPick }: { onPick: (t: Template) => void }) {
   return (
-    <div className="panel mt-4">
+    <div className="panel">
       <h2 className="panel-title">Start from a template</h2>
       <p className="mb-3 text-xs text-zinc-400">Replaces the screens in this project. You can undo it, and change any figure afterwards.</p>
       <div className="grid gap-3 sm:grid-cols-2">

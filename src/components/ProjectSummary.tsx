@@ -23,10 +23,13 @@ export default function ProjectSummary({
   rows,
   checks,
   onOpen,
+  embedded = false,
 }: {
   rows: SummaryRow[];
   checks: Check[];
   onOpen: (id: string) => void;
+  /** Drawn inside another panel, so no box of its own */
+  embedded?: boolean;
 }) {
   const live = rows.filter((r) => r.cabinets > 0);
   if (live.length === 0) return null;
@@ -35,9 +38,11 @@ export default function ProjectSummary({
   const warns = checks.filter((c) => c.level === "warn").length;
   const kva = sum((r) => r.watts) / 1000;
 
+  const Heading = embedded ? "h3" : "h2";
+
   return (
-    <div className="panel">
-      <h2 className="panel-title">Project at a glance</h2>
+    <div className={embedded ? "mb-5 border-b border-zinc-800 pb-5" : "panel"}>
+      <Heading className={embedded ? "mb-3 text-sm font-semibold text-zinc-200" : "panel-title"}>Project at a glance</Heading>
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-5">
         <Stat label="Screens" value={live.length} />
         <Stat label="Cabinets" value={sum((r) => r.cabinets)} />

@@ -632,29 +632,15 @@ function App() {
       body = (
         <div className="max-w-4xl space-y-4">
         <InstallHint />
-        <ProjectSummary
-          rows={screens.map((x, i) => ({
-            id: x.id,
-            name: x.name,
-            panel: all[i].selectedPanel ? `${all[i].selectedPanel!.manufacturer} ${all[i].selectedPanel!.model}` : "",
-            cabinets: all[i].cabinetCount,
-            resWidth: all[i].resWidth,
-            resHeight: all[i].resHeight,
-            widthMetres: all[i].widthMetres,
-            heightMetres: all[i].heightMetres,
-            watts: all[i].totalPower,
-            kg: all[i].totalWeight,
-            processor: x.processor,
-            processors: all[i].processorsRequired,
-            overloaded: all[i].overloaded,
-          }))}
-          checks={checks}
-          onOpen={(id) => {
-            setActiveId(id);
-            goTo("screen");
+        <TemplatePicker
+          onPick={(t) => {
+            if (!window.confirm(`Replace this project's screens with "${t.name}"?`)) return;
+            const made = templateScreens(t);
+            setScreens(made);
+            setActiveId(made[0].id);
+            nextNumber.current = made.length + 1;
           }}
         />
-        <ProcessorSharing plan={sharing} />
         <ProjectDetails
           projectName={projectName}
           setProjectName={setProjectName}
@@ -669,16 +655,32 @@ function App() {
           notes={notes}
           setNotes={setNotes}
         />
-        <RevisionHistory revision={revision} figures={figures} />
-        <TemplatePicker
-          onPick={(t) => {
-            if (!window.confirm(`Replace this project's screens with "${t.name}"?`)) return;
-            const made = templateScreens(t);
-            setScreens(made);
-            setActiveId(made[0].id);
-            nextNumber.current = made.length + 1;
-          }}
-        />
+        <RevisionHistory revision={revision} figures={figures}>
+          <ProjectSummary
+            embedded
+            rows={screens.map((x, i) => ({
+              id: x.id,
+              name: x.name,
+              panel: all[i].selectedPanel ? `${all[i].selectedPanel!.manufacturer} ${all[i].selectedPanel!.model}` : "",
+              cabinets: all[i].cabinetCount,
+              resWidth: all[i].resWidth,
+              resHeight: all[i].resHeight,
+              widthMetres: all[i].widthMetres,
+              heightMetres: all[i].heightMetres,
+              watts: all[i].totalPower,
+              kg: all[i].totalWeight,
+              processor: x.processor,
+              processors: all[i].processorsRequired,
+              overloaded: all[i].overloaded,
+            }))}
+            checks={checks}
+            onOpen={(id) => {
+              setActiveId(id);
+              goTo("screen");
+            }}
+          />
+        </RevisionHistory>
+        <ProcessorSharing plan={sharing} />
         </div>
       );
       break;

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   compareRevisions,
   deleteRevision,
@@ -16,10 +16,13 @@ const when = (iso: string) => {
 export default function RevisionHistory({
   revision,
   figures,
+  children,
 }: {
   /** The revision name currently typed in Project Details */
   revision: string;
   figures: ScreenFigures[];
+  /** Shown at the top of the panel, above the revision tools */
+  children?: ReactNode;
 }) {
   const saved = useRevisions();
   const [pickedId, setPickedId] = useState("");
@@ -42,6 +45,8 @@ export default function RevisionHistory({
   return (
     <div className="panel">
       <h2 className="panel-title">Revisions</h2>
+      {children}
+      <h3 className="mb-1 text-sm font-semibold text-zinc-200">Save and compare</h3>
       <p className="mb-3 text-sm text-zinc-400">
         Save the key figures under the revision name above, then change the design and see exactly what moved. Kept in this
         browser only.
