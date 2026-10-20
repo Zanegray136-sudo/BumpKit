@@ -27,7 +27,14 @@ export function SafeLinesSvg({ width, height, unit }: { width: number; height: n
         return (
           <g key={a.id}>
             <rect x={a.x} y={a.y} width={a.width} height={a.height} fill="none" stroke={col} strokeWidth={sw} strokeDasharray={`${sw * 6} ${sw * 4}`} />
-            <text x={a.x + sw * 3} y={a.y + fs + sw} fill={col} fontSize={fs} fontFamily="ui-monospace, monospace">
+            <text
+              x={a.id === "action" ? a.x + a.width - sw * 3 : a.x + sw * 3}
+              y={a.id === "action" ? a.y + a.height - sw * 3 : a.y + a.height - sw * 3}
+              textAnchor={a.id === "action" ? "end" : "start"}
+              fill={col}
+              fontSize={fs}
+              fontFamily="ui-monospace, monospace"
+            >
               {a.label}
             </text>
           </g>
