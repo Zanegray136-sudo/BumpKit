@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calcDistro, defaultDistro, type DistroCircuit } from "../src/utils/distro";
+import { calcDistro, defaultDistro, distroLabel, type DistroCircuit } from "../src/utils/distro";
 
 const c = (group: string, number: number): DistroCircuit => ({
   group, screen: group, number, cabinets: 4, watts: 2000, amps: 8.7, voltage: 230, breakerAmps: 16,
@@ -21,5 +21,19 @@ describe("distro per screen", () => {
   it("adds more distros for a screen with more circuits than ways", () => {
     const p = calcDistro(circuits, false, { ...defaultDistro, ways: 2, perScreen: true })!;
     expect(p.units.map((u) => u.screen)).toEqual(["Main", "Main", "Side"]);
+  });
+});
+
+describe("distro names", () => {
+  it("falls back to D and the number", () => {
+    expect(distroLabel({}, 3)).toBe("D3");
+    expect(distroLabel({ "3": "  " }, 3)).toBe("D3");
+    expect(distroLabel({ "3": "FOH" }, 3)).toBe("FOH");
+  });
+  it("puts the names on units and rows", () => {
+    const p = calcDistro(circuits, false, { ...defaultDistro, ways: 4, perScreen: true, names: { "1": "Main", "2": "Stage left" } })!;
+    expect(p.units.map((u) => u.label)).toEqual(["Main", "Stage left"]);
+    expect(p.rows[0].label).toBe("Main");
+    expect(p.rows[4].label).toBe("Stage left");
   });
 });

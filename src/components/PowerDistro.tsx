@@ -1,5 +1,5 @@
 import type { DistroPlan, DistroSettings } from "../utils/distro";
-import { cableAmpacity, cableSizes } from "../utils/distro";
+import { MAX_DISTRO_NAME, cableAmpacity, cableSizes } from "../utils/distro";
 import { fmtM } from "../utils/units";
 import { NumberField, Notice, SettingsGroup, Select, Stat, Toggle } from "./ui";
 
@@ -80,8 +80,20 @@ export default function PowerDistro({ plan, settings: s, setSettings }: Props) {
                 <tbody className="divide-y divide-zinc-800 text-zinc-200">
                   {plan.units.map((u) => (
                     <tr key={u.number}>
-                      <td className="py-2 pr-4 font-semibold">
-                        D{u.number}
+                      <td className="py-2 pr-4">
+                        <input
+                          className="input !w-28 !py-1 font-semibold"
+                          aria-label={`Name for distro ${u.number}`}
+                          value={s.names[String(u.number)] ?? ""}
+                          placeholder={`D${u.number}`}
+                          maxLength={MAX_DISTRO_NAME}
+                          onChange={(e) => {
+                            const names = { ...s.names };
+                            if (e.target.value.trim()) names[String(u.number)] = e.target.value;
+                            else delete names[String(u.number)];
+                            setSettings({ ...s, names });
+                          }}
+                        />
                         {u.screen && <span className="ml-2 font-normal text-zinc-400">{u.screen}</span>}
                       </td>
                       <td className="pr-4">
@@ -117,7 +129,7 @@ export default function PowerDistro({ plan, settings: s, setSettings }: Props) {
                   {plan.rows.map((r, i) => (
                     <tr key={i}>
                       <td className="py-1.5 pr-4 font-semibold">
-                        D{r.distro}-{r.way}
+                        {r.label}-{r.way}
                       </td>
                       <td className="pr-4">
                         {r.screen ? `${r.screen} ` : ""}C{String(r.number).padStart(2, "0")}

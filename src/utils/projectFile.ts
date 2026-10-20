@@ -78,6 +78,16 @@ const cleanPanels = (v: unknown): LedPanel[] => {
   return out;
 };
 
+const cleanNames = (v: unknown): Record<string, string> => {
+  const out: Record<string, string> = {};
+  if (isObj(v)) {
+    for (const [k, val] of Object.entries(v)) {
+      if (/^\d{1,3}$/.test(k) && typeof val === "string" && val.trim()) out[k] = val.trim().slice(0, 16);
+    }
+  }
+  return out;
+};
+
 const cleanDistro = (v: unknown): DistroSettings => {
   const o = isObj(v) ? v : {};
   const n = (k: keyof DistroSettings, lo: number, hi: number) =>
@@ -91,6 +101,7 @@ const cleanDistro = (v: unknown): DistroSettings => {
     generatorMargin: n("generatorMargin", 0, 200),
     maxDropPct: n("maxDropPct", 0.5, 20),
     perScreen: o.perScreen === true,
+    names: cleanNames(o.names),
   };
 };
 

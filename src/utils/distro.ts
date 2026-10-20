@@ -15,7 +15,14 @@ export type DistroSettings = {
   maxDropPct: number;
   /** Give each screen its own distro boxes instead of sharing them across screens */
   perScreen: boolean;
+  /** Your own names for distros, by distro number. Unnamed ones are D1, D2 and so on. */
+  names: Record<string, string>;
 };
+
+export const MAX_DISTRO_NAME = 16;
+
+/** The name shown for distro number n. */
+export const distroLabel = (names: Record<string, string> | undefined, n: number) => names?.[String(n)]?.trim() || `D${n}`;
 
 export const defaultDistro: DistroSettings = {
   ways: 6,
@@ -26,6 +33,7 @@ export const defaultDistro: DistroSettings = {
   generatorMargin: 25,
   maxDropPct: 3,
   perScreen: false,
+  names: {},
 };
 
 export type DistroCircuit = {
@@ -42,6 +50,8 @@ export type DistroCircuit = {
 
 export type DistroRow = DistroCircuit & {
   distro: number;
+  /** Name of the distro, e.g. FOH or D3 */
+  label: string;
   way: number;
   phase: string;
   dropPct: number;
@@ -49,6 +59,7 @@ export type DistroRow = DistroCircuit & {
 
 export type DistroUnit = {
   number: number;
+  label: string;
   /** The screen this distro serves, when each screen has its own */
   screen: string;
   used: number;
@@ -141,6 +152,7 @@ export function calcDistro(circuits: DistroCircuit[], threePhaseJob: boolean, s:
         rows.push({
           ...c,
           distro,
+          label: distroLabel(s.names, distro),
           way: i + 1,
           phase: assigned.get(i) ?? phases[0],
           dropPct: c.voltage > 0 ? (dropV / c.voltage) * 100 : 0,
@@ -164,6 +176,7 @@ export function calcDistro(circuits: DistroCircuit[], threePhaseJob: boolean, s:
     const ref = threePhaseJob ? voltage * Math.sqrt(3) : voltage;
     return {
       number: k + 1,
+      label: distroLabel(s.names, k + 1),
       screen: s.perScreen ? mine[0]?.screen ?? "" : "",
       used: mine.length,
       phaseAmps,

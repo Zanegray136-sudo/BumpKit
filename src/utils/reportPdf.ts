@@ -1040,7 +1040,7 @@ export function buildReport(d: ReportData, o: ReportOptions): jsPDF {
         { header: "Supply drop", width: 20, align: "right" },
       ],
       dp.units.map((u) => [
-        `D${u.number}${u.screen ? ` ${u.screen}` : ""}`,
+        `${u.label}${u.screen ? ` ${u.screen}` : ""}`,
         `${u.used} of ${ds.ways}`,
         u.phaseAmps.map((p) => `${p.phase} ${p.amps.toFixed(1)} A`).join("   "),
         u.supplyAmps ? `${u.supplyAmps} A ${dp.three ? "3 phase" : "1 phase"}` : "Over 630 A",
@@ -1050,7 +1050,7 @@ export function buildReport(d: ReportData, o: ReportOptions): jsPDF {
     y += 4;
     table(
       [
-        { header: "Way", width: 14 },
+        { header: "Way", width: 26 },
         { header: "Circuit", width: 28 },
         { header: "Cabinets", width: 16, align: "right" },
         { header: "Current", width: 18, align: "right" },
@@ -1059,7 +1059,7 @@ export function buildReport(d: ReportData, o: ReportOptions): jsPDF {
         { header: "Drop", width: 14, align: "right" },
       ],
       dp.rows.map((r) => [
-        `D${r.distro}-${r.way}`,
+        `${r.label}-${r.way}`,
         `${r.screen ? r.screen + " " : ""}C${String(r.number).padStart(2, "0")}`,
         String(r.cabinets),
         `${r.amps.toFixed(1)} A`,
