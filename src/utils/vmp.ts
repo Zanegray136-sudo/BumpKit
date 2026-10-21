@@ -197,3 +197,36 @@ export function screenObj(s: ReportData): string {
   });
   return [...lines, ...vts, "vn 0 0 1", ...faces.map((f) => (f.startsWith("f ") ? f + "" : f))].join("\n") + "\n";
 }
+
+/** Pixera's pixel-map CSV allows no more rows than this here, because one row is written per LED pixel. */
+export const PIXERA_MAX_PIXELS = 8_000_000;
+
+/**
+ * Pixera pixel-map CSV (the format of Pixera's own sample: semicolon separated, one row per pixel,
+ * columns src_pxl_pos_x;src_pxl_pos_y;dest_pxl_pos_x;dest_pxl_pos_y, x as the outer loop).
+ * The source is the pixel on the screen's canvas. The destination is the same pixel moved by (offsetX, offsetY).
+ * Returns text chunks to build a Blob from, or null if the wall is too large.
+ */
+export function pixeraCsvParts(s: ReportData, offsetX = 0, offsetY = 0): string[] | null {
+  const cabs = vmpCabinets(s);
+  const total = cabs.reduce((n, c) => n + c.w * c.h, 0);
+  if (cabs.length === 0 || total > PIXERA_MAX_PIXELS) return null;
+  // Group cabinets by pixel column so rows come out x first, then y, like Pixera's own file.
+  const cols = new Map<number, { y: number; h: number }[]>();
+  for (const c of cabs) {
+    for (let x = c.x; x < c.x + c.w; x++) {
+      const list = cols.get(x) ?? [];
+      list.push({ y: c.y, h: c.h });
+      cols.set(x, list);
+    }
+  }
+  const parts = ["src_pxl_pos_x;src_pxl_pos_y;dest_pxl_pos_x;dest_pxl_pos_y\n"];
+  for (const x of [...cols.keys()].sort((a, b) => a - b)) {
+    const rows: string[] = [];
+    for (const r of cols.get(x)!.sort((a, b) => a.y - b.y)) {
+      for (let y = r.y; y < r.y + r.h; y++) rows.push(`${x};${y};${x + offsetX};${y + offsetY}`);
+    }
+    parts.push(rows.join("\n") + "\n");
+  }
+  return parts;
+}

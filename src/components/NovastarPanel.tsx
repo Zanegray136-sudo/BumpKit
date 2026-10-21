@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ReportData } from "../utils/reportPdf";
-import { patchNprj, screenObj, vmpCabinets, vmpLayoutJson } from "../utils/vmp";
+import { PIXERA_MAX_PIXELS, patchNprj, pixeraCsvParts, screenObj, vmpCabinets, vmpLayoutJson } from "../utils/vmp";
 import { Select } from "./ui";
 
 function save(data: BlobPart, name: string, type: string) {
@@ -15,6 +15,8 @@ function save(data: BlobPart, name: string, type: string) {
 export default function NovastarPanel({ data }: { data: ReportData }) {
   const screens = [data, ...(data.extraScreens ?? [])].filter((x) => x.screen && x.screen.cabinets > 0);
   const [pick, setPick] = useState(0);
+  const [offX, setOffX] = useState(0);
+  const [offY, setOffY] = useState(0);
   const [msg, setMsg] = useState<{ ok: boolean; lines: string[] } | null>(null);
   const s = screens[Math.min(pick, screens.length - 1)];
   if (!s) return null;
@@ -70,6 +72,35 @@ export default function NovastarPanel({ data }: { data: ReportData }) {
       </div>
       <p className="mt-1 text-xs text-zinc-500">
         Metres, one quad per cabinet, UVs matching the canvas. A generic mesh for disguise, Pixera or Notch to import, not their native screen files.
+      </p>
+      <h3 className="mt-3 text-xs font-medium text-zinc-300">Pixera pixel map</h3>
+      <div className="mt-1 flex flex-wrap items-end gap-2 text-xs text-zinc-400">
+        <label>
+          Output X offset
+          <input type="number" className="input block !w-24" value={offX} onChange={(e) => setOffX(Number(e.target.value) || 0)} aria-label="Pixera output X offset" />
+        </label>
+        <label>
+          Output Y offset
+          <input type="number" className="input block !w-24" value={offY} onChange={(e) => setOffY(Number(e.target.value) || 0)} aria-label="Pixera output Y offset" />
+        </label>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => {
+            const parts = pixeraCsvParts(s, offX, offY);
+            if (!parts) {
+              setMsg({ ok: false, lines: [`That wall is too big for a pixel-per-row file (limit ${PIXERA_MAX_PIXELS.toLocaleString()} pixels).`] });
+              return;
+            }
+            setMsg(null);
+            save(parts.join(""), `${base}-pixera-pixelmap.csv`, "text/csv");
+          }}
+        >
+          Pixera pixel map CSV
+        </button>
+      </div>
+      <p className="mt-1 text-xs text-zinc-500">
+        Built to match Pixera's sample file: one row per LED pixel, from its place in this screen's content to its place on the output. Import it under the mapping's Warp, with Selective Target Rendering set to Texture per Screen.
       </p>
       <p className="mt-2 text-xs text-amber-400">
         Experimental. Patching is checked against a real project but has not been opened in VMP. Try the copy on a spare machine first.

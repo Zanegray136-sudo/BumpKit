@@ -107,3 +107,22 @@ describe("screen mesh", () => {
     expect(o.split("\n").filter((l) => l.startsWith("f ")).length).toBe(2);
   });
 });
+
+import { pixeraCsvParts } from "../src/utils/vmp";
+describe("pixera pixel map", () => {
+  it("writes Pixera's header, semicolons and x-then-y order", () => {
+    const d = {
+      screenName: "Main",
+      numberingMode: "rowcol",
+      removed: new Set<string>(),
+      canvas: { width: 4, height: 2, wide: 2, high: 1, colX: [0, 2, 4], rowY: [0, 2] },
+      dataPlan: { map: [[{ port: 1, seq: 1 }, { port: 1, seq: 2 }]] },
+    } as unknown as ReportData;
+    const t = pixeraCsvParts(d, 600, 400)!.join("").split("\n");
+    expect(t[0]).toBe("src_pxl_pos_x;src_pxl_pos_y;dest_pxl_pos_x;dest_pxl_pos_y");
+    expect(t[1]).toBe("0;0;600;400");
+    expect(t[2]).toBe("0;1;600;401");
+    expect(t[3]).toBe("1;0;601;400");
+    expect(t.filter((l) => l.length > 0).length).toBe(1 + 8);
+  });
+});
