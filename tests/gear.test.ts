@@ -23,7 +23,7 @@ describe("gear library", () => {
     const a = addPreset(emptyDiagram(), { name: "Cam", kind: "camera", ins: 0, outs: 1, outType: "SDI" }, 0, 0);
     const b = addNode(a.diagram, "screen", 300, 0);
     const ok = connectPorts(b.diagram, a.id, 0, b.id, 0, "SDI").diagram;
-    expect(diagramChecks(ok).some((c) => c.text.includes("but the cable is"))).toBe(true); // screen takes Cat6
+    expect(diagramChecks(ok).some((c) => c.text.includes("takes Cat6") && c.level === "error")).toBe(true); // screen takes Cat6
     const clean = connectPorts(setPortTypes(b.diagram, b.id, undefined, undefined), a.id, 0, b.id, 0, "SDI").diagram;
     expect(diagramChecks(clean).some((c) => c.text.includes("but the cable is"))).toBe(false);
     const bad = connectPorts(setPortTypes(b.diagram, b.id, undefined, undefined), a.id, 0, b.id, 0, "HDMI").diagram;

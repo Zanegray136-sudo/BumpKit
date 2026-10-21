@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { avGear, genericGear, portSummary, presetOf } from "../src/data/avGear";
-import { addNode, cableShort, diagramSvg, addPreset, cableBetween, connectPorts, diagramChecks, emptyDiagram, parseDiagram, portCable, setPorts, MAX_PORTS } from "../src/utils/signal";
+import { addNode, mismatchFix, cableShort, diagramSvg, addPreset, cableBetween, connectPorts, diagramChecks, emptyDiagram, parseDiagram, portCable, setPorts, MAX_PORTS } from "../src/utils/signal";
 import { parseGear, presetFromNode } from "../src/utils/gearLibrary";
 
 describe("gear catalogue", () => {
@@ -107,5 +107,23 @@ describe("port tags", () => {
     const svg = diagramSvg({ ...d.diagram, nodes: d.diagram.nodes.map((x) => ({ ...x, inType: "SDI" as const, outType: "HDMI" as const })) });
     expect(svg.includes(">SDI</text>")).toBe(true);
     expect(svg.includes(">HDMI</text>")).toBe(true);
+  });
+});
+
+describe("mismatched ports", () => {
+  it("flags SDI into HDMI as an error with a converter suggestion", () => {
+    let d = emptyDiagram();
+    const a = addNode(d, "camera", 0, 0);
+    const b = addNode(a.diagram, "projector", 300, 0);
+    d = {
+      ...b.diagram,
+      nodes: b.diagram.nodes.map((n) => (n.id === a.id ? { ...n, outType: "SDI" as const } : { ...n, inType: "HDMI" as const })),
+    };
+    d = connectPorts(d, a.id, 0, b.id, 0, "SDI").diagram;
+    const bad = diagramChecks(d).filter((c) => c.level === "error");
+    expect(bad.length).toBe(1);
+    expect(bad[0].text.includes("SDI to HDMI converter")).toBe(true);
+    expect(mismatchFix("USB", "Fibre")).toBe("Add a converter from USB to Fibre.");
+    expect(diagramSvg(d).includes('stroke-dasharray="7 5"')).toBe(true);
   });
 });

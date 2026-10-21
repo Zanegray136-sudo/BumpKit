@@ -361,6 +361,45 @@ export type Check = { level: "error" | "warn" | "info"; text: string; node?: str
 const needsSignal: NodeKind[] = ["screen", "processor", "switcher", "converter", "projector"];
 
 /** Things to look at: boxes with nothing in, cables that are too long, loops and boxes left alone. */
+/** What to add so an output of one cable type can feed an input of another. */
+export function mismatchFix(from: Cable, to: Cable): string {
+  const pair = `${from}>${to}`;
+  const known: Record<string, string> = {
+    "SDI>HDMI": "Add an SDI to HDMI converter (for example a Blackmagic Mini Converter SDI to HDMI 6G).",
+    "HDMI>SDI": "Add an HDMI to SDI converter (for example a Blackmagic Mini Converter HDMI to SDI 6G).",
+    "DisplayPort>HDMI": "Use a DisplayPort to HDMI adapter cable. Active ones are needed above 4K30.",
+    "HDMI>DisplayPort": "Add an active HDMI to DisplayPort converter. A plain cable will not work.",
+    "HDMI>DVI": "A plain HDMI to DVI cable works for video only, up to 1080p.",
+    "DVI>HDMI": "A plain DVI to HDMI cable works for video only, up to 1080p.",
+    "DisplayPort>DVI": "Use a DisplayPort to DVI adapter.",
+    "DVI>DisplayPort": "Add an active DVI to DisplayPort converter.",
+    "HDMI>NDI": "Add an NDI encoder (for example a Magewell Pro Convert HDMI 4K+).",
+    "SDI>NDI": "Add an NDI encoder that takes SDI (for example a Magewell Pro Convert SDI 4K Plus).",
+    "NDI>HDMI": "Add an NDI decoder (for example a Magewell Pro Convert NDI to HDMI 4K+).",
+    "NDI>SDI": "Add an NDI decoder with SDI output.",
+    "HDMI>Cat6": "Add an HDMI over Cat6 extender, or an NDI encoder if it is going onto a network.",
+    "SDI>Cat6": "Add an NDI encoder if it is going onto a network.",
+    "Cat6>HDMI": "Add an HDMI over Cat6 receiver, or an NDI decoder if it comes off a network.",
+    "Cat6>SDI": "Add an NDI decoder with SDI output if it comes off a network.",
+    "SDI>Fibre": "Add an SDI to fibre transmitter (or an SFP module if the box has a cage).",
+    "Fibre>SDI": "Add a fibre to SDI receiver (or an SFP module if the box has a cage).",
+    "HDMI>Fibre": "Add an HDMI to fibre transmitter.",
+    "Fibre>HDMI": "Add a fibre to HDMI receiver.",
+    "HDMI>USB": "Add a USB capture card.",
+    "SDI>USB": "Add an SDI to USB capture card.",
+    "USB>HDMI": "A USB output cannot feed HDMI directly. Use a USB display adapter or a different output.",
+  };
+  return known[pair] ?? `Add a converter from ${from} to ${to}.`;
+}
+
+/** The fix to show when the output on one end and the input on the other use different connectors, otherwise null. */
+export function portMismatch(a: SigNode | undefined, b: SigNode | undefined, e: Pick<SigEdge, "fromPort" | "toPort">): { from: Cable; to: Cable; fix: string } | null {
+  const ot = portCable(a, "out", e.fromPort);
+  const it = portCable(b, "in", e.toPort);
+  if (!ot || !it || ot === it || ot === "Other" || it === "Other") return null;
+  return { from: ot, to: it, fix: mismatchFix(ot, it) };
+}
+
 export function diagramChecks(d: Diagram): Check[] {
   const out: Check[] = [];
   const name = (id: string) => d.nodes.find((n) => n.id === id)?.label ?? "?";
@@ -381,7 +420,9 @@ export function diagramChecks(d: Diagram): Check[] {
     const b = d.nodes.find((n) => n.id === e.to);
     const ot = portCable(a, "out", e.fromPort);
     const it = portCable(b, "in", e.toPort);
-    if (ot && ot !== e.cable) out.push({ level: "warn", text: `${name(e.from)} output ${e.fromPort + 1} is ${ot}, but the cable is ${e.cable}.`, edge: e.id });
+    const mm = portMismatch(a, b, e);
+    if (mm) out.push({ level: "error", text: `${name(e.from)} output ${e.fromPort + 1} is ${mm.from} but ${name(e.to)} input ${e.toPort + 1} takes ${mm.to}. ${mm.fix}`, edge: e.id });
+    else if (ot && ot !== e.cable) out.push({ level: "warn", text: `${name(e.from)} output ${e.fromPort + 1} is ${ot}, but the cable is ${e.cable}.`, edge: e.id });
     else if (it && it !== e.cable) out.push({ level: "warn", text: `${name(e.to)} input ${e.toPort + 1} takes ${it}, but the cable is ${e.cable}.`, edge: e.id });
     const lim = maxLength(e.cable, e.format);
     if (lim === 0) out.push({ level: "error", text: `${e.cable} can't carry ${e.format} (${name(e.from)} to ${name(e.to)}).`, edge: e.id });
@@ -554,9 +595,10 @@ export function diagramSvg(d: Diagram, title = ""): string {
     const b = byId.get(e.to);
     if (!a || !b) continue;
     const p = edgePath(a, e.fromPort, b, e.toPort);
-    const col = cableColour[e.cable];
-    parts.push(`<path d="${p.d}" fill="none" stroke="${col}" stroke-width="2.5"/>`);
-    const text = edgeText(e);
+    const bad = portMismatch(a, b, e);
+    const col = bad ? "#dc2626" : cableColour[e.cable];
+    parts.push(`<path d="${p.d}" fill="none" stroke="${col}" stroke-width="2.5"${bad ? ' stroke-dasharray="7 5"' : ""}/>`);
+    const text = (bad ? "! " : "") + edgeText(e);
     parts.push(`<rect x="${p.mx - text.length * 3.2 - 6}" y="${p.my - 10}" width="${text.length * 6.4 + 12}" height="20" rx="4" fill="#ffffff" stroke="${col}"/>`);
     parts.push(`<text x="${p.mx}" y="${p.my + 4}" font-size="11" text-anchor="middle" fill="${col}">${esc(text)}</text>`);
   }

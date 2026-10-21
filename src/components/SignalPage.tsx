@@ -32,6 +32,7 @@ import {
   labelLines,
   portCable,
   cableShort,
+  portMismatch,
   setPortTypes,
   autoLayoutZones,
   freeSpot,
@@ -173,12 +174,14 @@ const NodeView = memo(function NodeView({
 
 const EdgeView = memo(function EdgeView({ e, a, b, selected, dim, onSelect }: { e: SigEdge; a: SigNode; b: SigNode; selected: boolean; dim: boolean; onSelect: (id: string) => void }) {
   const p = edgePath(a, e.fromPort, b, e.toPort);
-  const col = cableColour[e.cable];
-  const text = edgeText(e);
+  const bad = portMismatch(a, b, e);
+  const col = bad ? "#dc2626" : cableColour[e.cable];
+  const text = (bad ? "! " : "") + edgeText(e);
   return (
     <g onPointerDown={(ev) => ev.stopPropagation()} onClick={() => onSelect(e.id)} style={{ cursor: "pointer" }} opacity={dim ? 0.2 : 1}>
+      {bad && <title>{`${bad.from} output into ${bad.to} input. ${bad.fix}`}</title>}
       <path d={p.d} fill="none" stroke="transparent" strokeWidth={14} />
-      <path d={p.d} fill="none" stroke={col} strokeWidth={selected ? 4.5 : 2.5} />
+      <path d={p.d} fill="none" stroke={col} strokeWidth={selected ? 4.5 : 2.5} strokeDasharray={bad ? "7 5" : undefined} />
       <rect x={p.mx - text.length * 3.2 - 6} y={p.my - 10} width={text.length * 6.4 + 12} height={20} rx={4} fill="#fff" stroke={col} strokeWidth={selected ? 2 : 1} />
       <text x={p.mx} y={p.my + 4} fontSize={11} textAnchor="middle" fill={col}>
         {text}
@@ -1188,6 +1191,14 @@ export default function SignalPage() {
                   <p className="text-xs text-zinc-400">
                     {byId.get(edge.from)?.label} out {edge.fromPort + 1} → {byId.get(edge.to)?.label} in {edge.toPort + 1}
                   </p>
+                  {(() => {
+                    const mm = portMismatch(d.nodes.find((x) => x.id === edge.from), d.nodes.find((x) => x.id === edge.to), edge);
+                    return mm ? (
+                      <p className="rounded border border-red-500/40 bg-red-500/10 p-2 text-xs text-red-300">
+                        <strong>Won't connect:</strong> {mm.from} output into a {mm.to} input. {mm.fix}
+                      </p>
+                    ) : null;
+                  })()}
                   <Select label="Cable" value={edge.cable} onChange={(v) => commit(updateEdge(d, edge.id, { cable: v as Cable }))} options={cables.map((c) => ({ value: c, label: c }))} />
                   <Select label="Signal" value={edge.format} onChange={(v) => commit(updateEdge(d, edge.id, { format: v as Format }))} options={formats.map((c) => ({ value: c, label: c }))} />
                   <label className="block text-xs text-zinc-400">
