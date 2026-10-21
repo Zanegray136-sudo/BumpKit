@@ -10,7 +10,7 @@ type Module = {
 
 const modules: Module[] = [
   { id: "led", name: "PixelPlan", blurb: "LED screens: data, power, rigging, cables, canvas, pick list, report and media server exports.", href: "#/project", status: "ready" },
-  { id: "signal", name: "Signal diagram", blurb: "Server, processor, switcher and screens, with the cables between them.", status: "next" },
+  { id: "signal", name: "Signal diagram", blurb: "Server, processor, switcher and screens, with the cables between them. Exports a picture and a patch list.", href: "#/signal", status: "ready" },
   { id: "gear", name: "Gear and patch lists", blurb: "One pick list and one patch list for the whole show.", status: "next" },
   { id: "schedule", name: "Schedule", blurb: "Bump-in, rehearsal and show dates for each job.", status: "next" },
   { id: "lighting", name: "Lighting", blurb: "Fixtures, DMX universes and power.", status: "later" },

@@ -1,22 +1,31 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { useEffect, useState, type ComponentType } from 'react'
+import { lazy, Suspense, useEffect, useState, type ComponentType } from 'react'
 import Hub from './components/Hub'
 import './index.css'
 import { decodeProject } from './utils/shareLink'
 import { startSharedView } from './utils/sharedView'
 
 /** The hub is the front door: an empty address, or #/hub. Any page of the LED planner goes straight to it. */
+const SignalPage = lazy(() => import('./components/SignalPage'))
+const isSignal = () => window.location.hash === '#/signal'
 const isHub = () => /^#?\/?(hub)?$/.test(window.location.hash)
 
 function Root({ App }: { App: ComponentType }) {
-  const [hub, setHub] = useState(isHub)
+  const [route, setRoute] = useState(() => (isSignal() ? 'signal' : isHub() ? 'hub' : 'app'))
   useEffect(() => {
-    const on = () => setHub(isHub())
+    const on = () => setRoute(isSignal() ? 'signal' : isHub() ? 'hub' : 'app')
     window.addEventListener('hashchange', on)
     return () => window.removeEventListener('hashchange', on)
   }, [])
-  return hub ? <Hub /> : <App />
+  if (route === 'signal') {
+    return (
+      <Suspense fallback={null}>
+        <SignalPage />
+      </Suspense>
+    )
+  }
+  return route === 'hub' ? <Hub /> : <App />
 }
 
 /** Opens a shared link (if there is one), then starts the app. */
