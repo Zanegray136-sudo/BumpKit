@@ -46,6 +46,15 @@ export type SigNode = {
   /** The cable each port takes, for boxes that mix connectors (8 HDMI and 8 SDI in, say). Ports past the end use inType / outType. */
   inTypes?: Cable[];
   outTypes?: Cable[];
+  /** The biggest picture this box can take in. Unset means no limit is known. */
+  maxFormat?: Format;
+  /** A problem someone has pinned to this box */
+  flag?: string;
+  /** Network address, for boxes on the network */
+  ip?: string;
+  /** Power draw in watts and height in rack units, if known */
+  watts?: number;
+  rackU?: number;
 };
 export type SigEdge = {
   id: string;
@@ -77,7 +86,7 @@ export const MAX_PORTS = 80;
 export const emptyDiagram = (): Diagram => ({ nodes: [], edges: [], zones: [], notes: [] });
 
 let counter = 0;
-const uid = (p: string) => `${p}${Date.now().toString(36)}${(counter++).toString(36)}`;
+export const newId = (p: string) => `${p}${Date.now().toString(36)}${(counter++).toString(36)}`;
 
 export const kindLabel = (k: NodeKind) => kinds.find((x) => x.id === k)?.label ?? "Other";
 
@@ -89,12 +98,12 @@ export const portPos = (n: SigNode, side: "in" | "out", i: number) => ({ x: side
 export function addNode(d: Diagram, kind: NodeKind, x: number, y: number, label?: string): { diagram: Diagram; id: string } {
   const k = kinds.find((a) => a.id === kind)!;
   const n = d.nodes.filter((a) => a.kind === kind).length + 1;
-  const node: SigNode = { id: uid("n"), kind, label: label ?? `${k.label} ${n}`, x, y, ins: k.ins, outs: k.outs, ...(k.inType ? { inType: k.inType } : {}), ...(k.outType ? { outType: k.outType } : {}) };
+  const node: SigNode = { id: newId("n"), kind, label: label ?? `${k.label} ${n}`, x, y, ins: k.ins, outs: k.outs, ...(k.inType ? { inType: k.inType } : {}), ...(k.outType ? { outType: k.outType } : {}) };
   return { diagram: { ...d, nodes: [...d.nodes, node] }, id: node.id };
 }
 
 /** A ready-made box: a name, a kind and its ports. */
-export type Preset = { name: string; kind: NodeKind; ins: number; outs: number; inType?: Cable; outType?: Cable; inTypes?: Cable[]; outTypes?: Cable[] };
+export type Preset = { name: string; kind: NodeKind; ins: number; outs: number; inType?: Cable; outType?: Cable; inTypes?: Cable[]; outTypes?: Cable[]; maxFormat?: Format; watts?: number; rackU?: number; source?: string; note?: string };
 
 /** The cable a port takes, if the box says. */
 export const portCable = (n: SigNode | undefined, side: "in" | "out", i: number): Cable | undefined =>
@@ -108,6 +117,9 @@ export function addPreset(d: Diagram, p: Preset, x: number, y: number): { diagra
   if (!node.outType) delete node.outType;
   if (!node.inTypes?.length) delete node.inTypes;
   if (!node.outTypes?.length) delete node.outTypes;
+  if (p.maxFormat) node.maxFormat = p.maxFormat;
+  if (p.watts) node.watts = p.watts;
+  if (p.rackU) node.rackU = p.rackU;
   return { diagram: { ...r.diagram, nodes: [...r.diagram.nodes.slice(0, -1), node] }, id: r.id };
 }
 
@@ -154,7 +166,7 @@ export function connectPorts(d: Diagram, from: string, fromPort: number, to: str
   if (fromPort < 0 || fromPort >= a.outs) return { diagram: d, id: null, error: `${a.label} has no output ${fromPort + 1}.` };
   if (toPort < 0 || toPort >= b.ins) return { diagram: d, id: null, error: `${b.label} has no input ${toPort + 1}.` };
   if (inputBusy(d, to, toPort)) return { diagram: d, id: null, error: `${b.label} input ${toPort + 1} already has a cable.` };
-  const edge: SigEdge = { id: uid("e"), from, fromPort, to, toPort, cable, label, format, length };
+  const edge: SigEdge = { id: newId("e"), from, fromPort, to, toPort, cable, label, format, length };
   return { diagram: { ...d, edges: [...d.edges, edge] }, id: edge.id };
 }
 
@@ -220,7 +232,7 @@ export const ZONE_BAR = 24;
 export const NOTE_W = 190;
 
 export function addZone(d: Diagram, x: number, y: number, label = "Zone", colour: ZoneColour = "blue"): { diagram: Diagram; id: string } {
-  const z: Zone = { id: uid("z"), label, x, y, w: 380, h: 260, colour };
+  const z: Zone = { id: newId("z"), label, x, y, w: 380, h: 260, colour };
   return { diagram: { ...d, zones: [...d.zones, z] }, id: z.id };
 }
 export const updateZone = (d: Diagram, id: string, patch: Partial<Pick<Zone, "label" | "colour">>): Diagram => ({ ...d, zones: d.zones.map((z) => (z.id === id ? { ...z, ...patch } : z)) });
@@ -252,7 +264,7 @@ export function moveZone(d: Diagram, id: string, x: number, y: number, withNodes
 }
 
 export function addNote(d: Diagram, x: number, y: number, text = "Note"): { diagram: Diagram; id: string } {
-  const n: Note = { id: uid("t"), x, y, text };
+  const n: Note = { id: newId("t"), x, y, text };
   return { diagram: { ...d, notes: [...d.notes, n] }, id: n.id };
 }
 export const updateNote = (d: Diagram, id: string, text: string): Diagram => ({ ...d, notes: d.notes.map((n) => (n.id === id ? { ...n, text } : n)) });
@@ -338,6 +350,8 @@ export function maxLength(cable: Cable, format: Format): number {
   }
 }
 
+export const isIpv4 = (v: string): boolean => /^(\d{1,3})(\.\d{1,3}){3}$/.test(v) && v.split(".").every((p) => Number(p) <= 255);
+
 export type Check = { level: "error" | "warn" | "info"; text: string; node?: string; edge?: string };
 
 const needsSignal: NodeKind[] = ["screen", "processor", "switcher", "converter", "projector"];
@@ -369,6 +383,25 @@ export function diagramChecks(d: Diagram): Check[] {
     if (lim === 0) out.push({ level: "error", text: `${e.cable} can't carry ${e.format} (${name(e.from)} to ${name(e.to)}).`, edge: e.id });
     else if (e.length > 0 && e.length > lim) out.push({ level: "warn", text: `${e.cable} run of ${e.length} m is long for ${e.format}. About ${lim} m is the usual limit (${name(e.from)} to ${name(e.to)}).`, edge: e.id });
   }
+  const rank = (f: Format) => formats.indexOf(f);
+  for (const e of d.edges) {
+    const b = d.nodes.find((n) => n.id === e.to);
+    if (b?.maxFormat && e.format !== "Other" && b.maxFormat !== "Other" && rank(e.format) > rank(b.maxFormat)) {
+      out.push({ level: "warn", text: `${name(e.from)} sends ${e.format} but ${b.label} only takes up to ${b.maxFormat}.`, edge: e.id });
+    }
+    if (e.cable === "SDI" && e.format === "4K60") out.push({ level: "info", text: `4K60 over SDI needs 12G-SDI gear at both ends (${name(e.from)} to ${name(e.to)}).`, edge: e.id });
+  }
+  for (const n of d.nodes) if (n.flag?.trim()) out.push({ level: "warn", text: `Flag on ${n.label}: ${n.flag.trim()}`, node: n.id });
+  const ips = new Map<string, string[]>();
+  for (const n of d.nodes) {
+    const ip = n.ip?.trim();
+    if (!ip) continue;
+    if (!isIpv4(ip)) out.push({ level: "warn", text: `${n.label} has an address that isn't a valid IPv4 address (${ip}).`, node: n.id });
+    else ips.set(ip, [...(ips.get(ip) ?? []), n.label]);
+  }
+  ips.forEach((names, ip) => {
+    if (names.length > 1) out.push({ level: "error", text: `${ip} is used by ${names.join(" and ")}.` });
+  });
   // A loop: follow the cables and see whether a box can reach itself.
   const next = new Map<string, string[]>();
   for (const e of d.edges) next.set(e.from, [...(next.get(e.from) ?? []), e.to]);
@@ -536,7 +569,13 @@ export function parseDiagram(v: unknown): Diagram {
     const full = (a: (Cable | undefined)[]) => (a.length > 0 && a.every(Boolean) ? (a as Cable[]) : undefined);
     const inTypes = full(list(n.inTypes, ins));
     const outTypes = full(list(n.outTypes, outs));
-    nodes.push({ id: n.id, kind: k.id, label: typeof n.label === "string" ? n.label : "", x: n.x, y: n.y, ins, outs, ...(inType ? { inType } : {}), ...(outType ? { outType } : {}), ...(inTypes ? { inTypes } : {}), ...(outTypes ? { outTypes } : {}) });
+    const maxFormat = (formats as readonly string[]).includes(n.maxFormat as string) ? n.maxFormat : undefined;
+    const flag = typeof n.flag === "string" && n.flag.trim() ? n.flag.slice(0, 300) : undefined;
+    const ip = typeof n.ip === "string" && n.ip.trim() ? n.ip.trim().slice(0, 45) : undefined;
+    const num = (x: unknown, max: number) => (typeof x === "number" && Number.isFinite(x) && x > 0 ? Math.min(max, x) : undefined);
+    const watts = num(n.watts, 100000);
+    const rackU = num(n.rackU, 100);
+    nodes.push({ id: n.id, kind: k.id, label: typeof n.label === "string" ? n.label : "", x: n.x, y: n.y, ins, outs, ...(inType ? { inType } : {}), ...(outType ? { outType } : {}), ...(inTypes ? { inTypes } : {}), ...(outTypes ? { outTypes } : {}), ...(maxFormat ? { maxFormat } : {}), ...(flag ? { flag } : {}), ...(ip ? { ip } : {}), ...(watts ? { watts } : {}), ...(rackU ? { rackU } : {}) });
   }
   const zones: Zone[] = [];
   for (const raw of Array.isArray((src as { zones?: unknown }).zones) ? ((src as { zones: unknown[] }).zones) : []) {
