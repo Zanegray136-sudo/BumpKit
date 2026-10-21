@@ -407,6 +407,7 @@ export default function LightingPage() {
 
 function Library({ onAdd, onAddCustom, positions }: { onAdd: (d: FixtureDef, mode: number, qty: number, pos: string) => void; onAddCustom: (name: string, ch: number, w: number, kg: number, qty: number, pos: string) => void; positions: string[] }) {
   const [q, setQ] = useState("");
+  const [by, setBy] = useState<"brand" | "type">("brand");
   const [group, setGroup] = useState("All");
   const [open, setOpen] = useState<string | null>(null);
   const [form, setForm] = useState({ mode: 0, qty: 1, pos: "" });
@@ -414,16 +415,28 @@ function Library({ onAdd, onAddCustom, positions }: { onAdd: (d: FixtureDef, mod
   const [cf, setCf] = useState({ name: "", ch: 10, w: 0, kg: 0, qty: 1, pos: "" });
 
   const words = q.toLowerCase().split(/\s+/).filter(Boolean);
-  const shown = allDefs.filter((d) => (group === "All" || d.group === group) && words.every((w) => `${d.brand} ${d.model}`.toLowerCase().includes(w)));
-  const brands = [...new Set(shown.map((d) => d.brand))].sort((a, b) => (a === "Generic" ? 1 : b === "Generic" ? -1 : a.localeCompare(b)));
-  const groups = ["All", ...fixtureGroups.filter((g) => allDefs.some((d) => d.group === g))];
+  const keyOf = (d: FixtureDef) => (by === "brand" ? d.brand : d.group);
+  const shown = allDefs.filter((d) => (group === "All" || keyOf(d) === group) && words.every((w) => `${d.brand} ${d.model}`.toLowerCase().includes(w)));
+  const brandSort = (a: string, b: string) => (a === "Generic" ? 1 : b === "Generic" ? -1 : a.localeCompare(b));
+  // Headings are the other way round: types inside a brand, brands inside a type.
+  const headOf = (d: FixtureDef) => (by === "brand" ? d.group : d.brand);
+  const heads = [...new Set(shown.map(headOf))].sort(by === "brand" ? (a, b) => fixtureGroups.indexOf(a as (typeof fixtureGroups)[number]) - fixtureGroups.indexOf(b as (typeof fixtureGroups)[number]) : brandSort);
+  const chips = ["All", ...(by === "brand" ? [...new Set(allDefs.map((d) => d.brand))].sort(brandSort) : fixtureGroups.filter((g) => allDefs.some((d) => d.group === g)))];
 
   return (
     <aside className="panel order-3 flex min-h-0 flex-col gap-3 !p-3 lg:order-none" aria-label="Fixture library">
       <h2 className="panel-title">Add fixtures</h2>
       <input className="input w-full" type="search" placeholder="Search brand or model" aria-label="Search fixtures" value={q} onChange={(e) => setQ(e.target.value)} />
-      <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Fixture groups">
-        {groups.map((g) => (
+      <div className="flex items-center gap-1 text-xs text-zinc-400" role="group" aria-label="Group fixtures by">
+        Group by
+        {(["brand", "type"] as const).map((m) => (
+          <button key={m} type="button" aria-pressed={by === m} onClick={() => (setBy(m), setGroup("All"))} className={`rounded-md border px-2 py-0.5 ${by === m ? "border-blue-500 bg-blue-500/20 text-blue-200" : "border-zinc-700 hover:text-zinc-100"}`}>
+            {m === "brand" ? "Brand" : "Type"}
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-1.5" role="tablist" aria-label={by === "brand" ? "Brands" : "Fixture types"}>
+        {chips.map((g) => (
           <button key={g} type="button" role="tab" aria-selected={group === g} onClick={() => setGroup(g)} className={`rounded-full border px-2.5 py-1 text-xs ${group === g ? "border-blue-500 bg-blue-500/20 text-blue-200" : "border-zinc-700 text-zinc-400 hover:text-zinc-100"}`}>
             {g}
           </button>
@@ -431,12 +444,12 @@ function Library({ onAdd, onAddCustom, positions }: { onAdd: (d: FixtureDef, mod
       </div>
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1" style={{ maxHeight: "60vh" }}>
         {shown.length === 0 && <p className="text-sm text-zinc-500">Nothing matches. Add your own fixture below.</p>}
-        {brands.map((b) => (
+        {heads.map((b) => (
           <section key={b}>
             <h3 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">{b}</h3>
             <ul className="space-y-1">
               {shown
-                .filter((d) => d.brand === b)
+                .filter((d) => headOf(d) === b)
                 .map((d) => {
                   const key = fixtureKey(d);
                   const isOpen = open === key;
