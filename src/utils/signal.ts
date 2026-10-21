@@ -53,14 +53,22 @@ export type SigEdge = {
   /** Cable length in metres, 0 when not set */
   length: number;
 };
-export type Diagram = { nodes: SigNode[]; edges: SigEdge[] };
+export const zoneColours = { blue: "#2563eb", green: "#16a34a", amber: "#d97706", pink: "#db2777", purple: "#7c3aed", grey: "#52525b" } as const;
+export type ZoneColour = keyof typeof zoneColours;
+
+/** A labelled coloured area behind the boxes, such as "FOH" or "Stage left". */
+export type Zone = { id: string; label: string; x: number; y: number; w: number; h: number; colour: ZoneColour };
+/** A sticky note with free text. */
+export type Note = { id: string; x: number; y: number; text: string };
+
+export type Diagram = { nodes: SigNode[]; edges: SigEdge[]; zones: Zone[]; notes: Note[] };
 
 export const NODE_W = 170;
 export const NODE_H = 58;
 export const PORT_GAP = 20;
 export const MAX_PORTS = 32;
 
-export const emptyDiagram = (): Diagram => ({ nodes: [], edges: [] });
+export const emptyDiagram = (): Diagram => ({ nodes: [], edges: [], zones: [], notes: [] });
 
 let counter = 0;
 const uid = (p: string) => `${p}${Date.now().toString(36)}${(counter++).toString(36)}`;
@@ -166,6 +174,7 @@ export const updateEdge = (d: Diagram, id: string, patch: Partial<Pick<SigEdge, 
 export const removeEdge = (d: Diagram, id: string): Diagram => ({ ...d, edges: d.edges.filter((e) => e.id !== id) });
 
 export const removeNode = (d: Diagram, id: string): Diagram => ({
+  ...d,
   nodes: d.nodes.filter((n) => n.id !== id),
   edges: d.edges.filter((e) => e.from !== id && e.to !== id),
 });
@@ -187,6 +196,79 @@ export function freeSpot(d: Diagram, x: number, y: number, kind: NodeKind = "oth
   }
   return { x, y };
 }
+
+export const ZONE_MIN_W = 140;
+export const ZONE_MIN_H = 90;
+export const ZONE_BAR = 24;
+export const NOTE_W = 190;
+
+export function addZone(d: Diagram, x: number, y: number, label = "Zone", colour: ZoneColour = "blue"): { diagram: Diagram; id: string } {
+  const z: Zone = { id: uid("z"), label, x, y, w: 380, h: 260, colour };
+  return { diagram: { ...d, zones: [...d.zones, z] }, id: z.id };
+}
+export const updateZone = (d: Diagram, id: string, patch: Partial<Pick<Zone, "label" | "colour">>): Diagram => ({ ...d, zones: d.zones.map((z) => (z.id === id ? { ...z, ...patch } : z)) });
+export const resizeZone = (d: Diagram, id: string, w: number, h: number): Diagram => ({
+  ...d,
+  zones: d.zones.map((z) => (z.id === id ? { ...z, w: Math.max(ZONE_MIN_W, Math.round(w)), h: Math.max(ZONE_MIN_H, Math.round(h)) } : z)),
+});
+export const removeZone = (d: Diagram, id: string): Diagram => ({ ...d, zones: d.zones.filter((z) => z.id !== id) });
+
+/** The boxes whose middle sits inside a zone. They travel with it. */
+export const nodesInZone = (d: Diagram, zoneId: string): string[] => {
+  const z = d.zones.find((a) => a.id === zoneId);
+  if (!z) return [];
+  return d.nodes.filter((n) => n.x + NODE_W / 2 >= z.x && n.x + NODE_W / 2 <= z.x + z.w && n.y + nodeHeight(n) / 2 >= z.y && n.y + nodeHeight(n) / 2 <= z.y + z.h).map((n) => n.id);
+};
+
+/** Moves a zone, and the given boxes with it, by the same amount. */
+export function moveZone(d: Diagram, id: string, x: number, y: number, withNodes: string[]): Diagram {
+  const z = d.zones.find((a) => a.id === id);
+  if (!z) return d;
+  const dx = x - z.x;
+  const dy = y - z.y;
+  const set = new Set(withNodes);
+  return {
+    ...d,
+    zones: d.zones.map((a) => (a.id === id ? { ...a, x, y } : a)),
+    nodes: d.nodes.map((n) => (set.has(n.id) ? { ...n, x: Math.max(0, n.x + dx), y: Math.max(0, n.y + dy) } : n)),
+  };
+}
+
+export function addNote(d: Diagram, x: number, y: number, text = "Note"): { diagram: Diagram; id: string } {
+  const n: Note = { id: uid("t"), x, y, text };
+  return { diagram: { ...d, notes: [...d.notes, n] }, id: n.id };
+}
+export const updateNote = (d: Diagram, id: string, text: string): Diagram => ({ ...d, notes: d.notes.map((n) => (n.id === id ? { ...n, text } : n)) });
+export const moveNote = (d: Diagram, id: string, x: number, y: number): Diagram => ({ ...d, notes: d.notes.map((n) => (n.id === id ? { ...n, x, y } : n)) });
+export const removeNote = (d: Diagram, id: string): Diagram => ({ ...d, notes: d.notes.filter((n) => n.id !== id) });
+
+/** Breaks note text into lines that fit, keeping the person's own line breaks. At most 14 lines. */
+export function wrapText(text: string, maxChars = 26): string[] {
+  const out: string[] = [];
+  for (const para of text.split("\n")) {
+    let line = "";
+    for (const word of para.split(/\s+/).filter(Boolean)) {
+      let w = word;
+      while (w.length > maxChars) {
+        if (line) {
+          out.push(line);
+          line = "";
+        }
+        out.push(w.slice(0, maxChars));
+        w = w.slice(maxChars);
+      }
+      if (!line) line = w;
+      else if (line.length + 1 + w.length <= maxChars) line += " " + w;
+      else {
+        out.push(line);
+        line = w;
+      }
+    }
+    out.push(line);
+  }
+  return out.slice(0, 14);
+}
+export const noteHeight = (n: Note) => 14 + wrapText(n.text).length * 15 + 8;
 
 /** The screens from the LED planner, as much as the diagram needs of them. */
 export type LedScreenInfo = { name: string; processor: string; wide: number; high: number };
@@ -328,8 +410,10 @@ export function patchCsv(d: Diagram): string {
 }
 
 export const diagramBounds = (d: Diagram) => {
-  const w = d.nodes.length ? Math.max(...d.nodes.map((n) => n.x + NODE_W)) : 0;
-  const h = d.nodes.length ? Math.max(...d.nodes.map((n) => n.y + nodeHeight(n))) : 0;
+  const rights = [...d.nodes.map((n) => n.x + NODE_W), ...d.zones.map((z) => z.x + z.w), ...d.notes.map((n) => n.x + NOTE_W)];
+  const bottoms = [...d.nodes.map((n) => n.y + nodeHeight(n)), ...d.zones.map((z) => z.y + z.h), ...d.notes.map((n) => n.y + noteHeight(n))];
+  const w = rights.length ? Math.max(...rights) : 0;
+  const h = bottoms.length ? Math.max(...bottoms) : 0;
   return { width: Math.max(900, w + 80), height: Math.max(520, h + 80) };
 };
 
@@ -356,6 +440,11 @@ export function diagramSvg(d: Diagram, title = ""): string {
     `<rect width="${width}" height="${height}" fill="#ffffff"/>`,
   ];
   if (title) parts.push(`<text x="24" y="28" font-size="16" font-weight="700" fill="#18181b">${esc(title)}</text>`);
+  for (const z of d.zones) {
+    const c = zoneColours[z.colour];
+    parts.push(`<rect x="${z.x}" y="${z.y}" width="${z.w}" height="${z.h}" rx="10" fill="${c}" fill-opacity="0.08" stroke="${c}" stroke-width="1.5" stroke-dasharray="6 4"/>`);
+    parts.push(`<text x="${z.x + 12}" y="${z.y + 17}" font-size="12" font-weight="700" fill="${c}">${esc(z.label)}</text>`);
+  }
   for (const e of d.edges) {
     const a = byId.get(e.from);
     const b = byId.get(e.to);
@@ -379,6 +468,11 @@ export function diagramSvg(d: Diagram, title = ""): string {
       const p = portPos(n, "out", i);
       parts.push(`<circle cx="${p.x}" cy="${p.y}" r="5" fill="#3f3f46"/><text x="${p.x - 9}" y="${p.y + 3}" font-size="8" text-anchor="end" fill="#71717a">${i + 1}</text>`);
     }
+  }
+  for (const n of d.notes) {
+    const lines = wrapText(n.text);
+    parts.push(`<rect x="${n.x}" y="${n.y}" width="${NOTE_W}" height="${noteHeight(n)}" rx="4" fill="#fef9c3" stroke="#ca8a04"/>`);
+    lines.forEach((l, i) => parts.push(`<text x="${n.x + 8}" y="${n.y + 18 + i * 15}" font-size="11" fill="#422006">${esc(l)}</text>`));
   }
   used.forEach((c, i) => {
     const x = 24 + i * 110;
@@ -411,7 +505,19 @@ export function parseDiagram(v: unknown): Diagram {
     const outType = ty(n.outType);
     nodes.push({ id: n.id, kind: k.id, label: typeof n.label === "string" ? n.label : "", x: n.x, y: n.y, ins: c(n.ins, k.ins), outs: c(n.outs, k.outs), ...(inType ? { inType } : {}), ...(outType ? { outType } : {}) });
   }
-  let d: Diagram = { nodes, edges: [] };
+  const zones: Zone[] = [];
+  for (const raw of Array.isArray((src as { zones?: unknown }).zones) ? ((src as { zones: unknown[] }).zones) : []) {
+    const z = raw as Partial<Zone>;
+    if (!z || typeof z.id !== "string" || typeof z.x !== "number" || typeof z.y !== "number" || typeof z.w !== "number" || typeof z.h !== "number") continue;
+    zones.push({ id: z.id, label: typeof z.label === "string" ? z.label.slice(0, 60) : "", x: z.x, y: z.y, w: Math.max(ZONE_MIN_W, z.w), h: Math.max(ZONE_MIN_H, z.h), colour: z.colour && z.colour in zoneColours ? z.colour : "blue" });
+  }
+  const notes: Note[] = [];
+  for (const raw of Array.isArray((src as { notes?: unknown }).notes) ? ((src as { notes: unknown[] }).notes) : []) {
+    const n = raw as Partial<Note>;
+    if (!n || typeof n.id !== "string" || typeof n.x !== "number" || typeof n.y !== "number") continue;
+    notes.push({ id: n.id, x: n.x, y: n.y, text: typeof n.text === "string" ? n.text.slice(0, 600) : "" });
+  }
+  let d: Diagram = { nodes, edges: [], zones, notes };
   for (const raw of src.edges) {
     const e = raw as Partial<SigEdge>;
     if (!e || typeof e.id !== "string" || typeof e.from !== "string" || typeof e.to !== "string" || !ids.has(e.from) || !ids.has(e.to)) continue;

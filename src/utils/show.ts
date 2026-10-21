@@ -11,7 +11,7 @@ export type ShowData = {
 
 export const emptyShow = (): ShowData => ({ signal: emptyDiagram(), gear: [], tables: {} });
 
-const isEmpty = (s: ShowData) => s.signal.nodes.length === 0 && s.gear.length === 0 && Object.values(s.tables).every((r) => r.length === 0);
+const isEmpty = (s: ShowData) => s.signal.nodes.length === 0 && s.signal.zones.length === 0 && s.signal.notes.length === 0 && s.gear.length === 0 && Object.values(s.tables).every((r) => r.length === 0);
 
 /** What this browser holds now. Null when there is nothing, so empty shows don't add to a file. */
 export function collectShow(): ShowData | null {

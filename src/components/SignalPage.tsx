@@ -6,6 +6,22 @@ import { downloadCombinedPng, downloadCombinedSvg, downloadCsv } from "../utils/
 import {
   NODE_W,
   addNode,
+  addNote,
+  addZone,
+  emptyDiagram,
+  moveNote,
+  moveZone,
+  NOTE_W,
+  noteHeight,
+  nodesInZone,
+  removeNote,
+  removeZone,
+  resizeZone,
+  updateNote,
+  updateZone,
+  wrapText,
+  zoneColours,
+  ZONE_BAR,
   addPreset,
   cableBetween,
   setPortTypes,
@@ -38,19 +54,25 @@ import {
   type Diagram,
   type Format,
   type NodeKind,
+  type Note,
   type Preset,
+  type Zone,
+  type ZoneColour,
   type SigEdge,
   type SigNode,
 } from "../utils/signal";
 
 const GRID = 10;
 const HIT = 12;
-type Sel = { type: "node" | "edge"; id: string } | null;
+type Sel = { type: "node" | "edge" | "zone" | "note"; id: string } | null;
 type View = { x: number; y: number; k: number };
 type Wire = { node: string; port: number; x: number; y: number } | null;
 type Action =
   | { mode: "node"; id: string; dx: number; dy: number; moved: boolean; sx: number; sy: number; snapshot: Diagram }
   | { mode: "wire"; node: string; port: number }
+  | { mode: "zone"; id: string; dx: number; dy: number; moved: boolean; sx: number; sy: number; snapshot: Diagram; carry: string[] }
+  | { mode: "zoneSize"; id: string; moved: boolean; sx: number; sy: number; snapshot: Diagram; ox: number; oy: number }
+  | { mode: "note"; id: string; dx: number; dy: number; moved: boolean; sx: number; sy: number; snapshot: Diagram }
   | { mode: "pan"; sx: number; sy: number; vx: number; vy: number; moved: boolean }
   | null;
 
@@ -123,6 +145,36 @@ const EdgeView = memo(function EdgeView({ e, a, b, selected, onSelect }: { e: Si
     </g>
   );
 });
+
+const ZoneView = memo(function ZoneView({ z, selected, onDown, onSizeDown }: { z: Zone; selected: boolean; onDown: (e: React.PointerEvent, id: string) => void; onSizeDown: (e: React.PointerEvent, id: string) => void }) {
+  const c = zoneColours[z.colour];
+  return (
+    <g>
+      <rect x={z.x} y={z.y} width={z.w} height={z.h} rx={10} fill={c} fillOpacity={0.08} stroke={c} strokeWidth={selected ? 3 : 1.5} strokeDasharray="6 4" pointerEvents="none" />
+      <rect x={z.x} y={z.y} width={z.w} height={ZONE_BAR} rx={10} fill={c} fillOpacity={0.18} onPointerDown={(e) => onDown(e, z.id)} style={{ cursor: "grab" }} />
+      <text x={z.x + 12} y={z.y + 17} fontSize={12} fontWeight={700} fill={c} pointerEvents="none">
+        {z.label}
+      </text>
+      <rect x={z.x + z.w - 14} y={z.y + z.h - 14} width={14} height={14} rx={3} fill={c} fillOpacity={0.5} onPointerDown={(e) => onSizeDown(e, z.id)} style={{ cursor: "nwse-resize" }} />
+    </g>
+  );
+});
+
+const NoteView = memo(function NoteView({ n, selected, onDown }: { n: Note; selected: boolean; onDown: (e: React.PointerEvent, id: string) => void }) {
+  return (
+    <g onPointerDown={(e) => onDown(e, n.id)} style={{ cursor: "grab" }}>
+      <rect x={n.x} y={n.y} width={NOTE_W} height={noteHeight(n)} rx={4} fill="#fef9c3" stroke={selected ? "#2563eb" : "#ca8a04"} strokeWidth={selected ? 3 : 1} />
+      {wrapText(n.text).map((l, i) => (
+        <text key={i} x={n.x + 8} y={n.y + 18 + i * 15} fontSize={11} fill="#422006" pointerEvents="none">
+          {l}
+        </text>
+      ))}
+    </g>
+  );
+});
+
+const removeSelected = (d: Diagram, sel: NonNullable<Sel>): Diagram =>
+  sel.type === "node" ? removeNode(d, sel.id) : sel.type === "edge" ? removeEdge(d, sel.id) : sel.type === "zone" ? removeZone(d, sel.id) : removeNote(d, sel.id);
 
 const dims = (svg: string) => ({ width: Number(svg.match(/ width="(\d+)"/)?.[1] ?? 900), height: Number(svg.match(/ height="(\d+)"/)?.[1] ?? 520) });
 
@@ -219,12 +271,17 @@ export default function SignalPage() {
   useEffect(() => {
     const el = wrap.current;
     if (!el) return;
-    const nodes = dRef.current.nodes;
-    if (nodes.length === 0) return;
-    const minX = Math.min(...nodes.map((n) => n.x));
-    const minY = Math.min(...nodes.map((n) => n.y));
-    const maxX = Math.max(...nodes.map((n) => n.x + NODE_W));
-    const maxY = Math.max(...nodes.map((n) => n.y + nodeHeight(n)));
+    const cur = dRef.current;
+    const boxes = [
+      ...cur.nodes.map((n) => ({ x: n.x, y: n.y, w: NODE_W, h: nodeHeight(n) })),
+      ...cur.zones.map((z) => ({ x: z.x, y: z.y, w: z.w, h: z.h })),
+      ...cur.notes.map((n) => ({ x: n.x, y: n.y, w: NOTE_W, h: noteHeight(n) })),
+    ];
+    if (boxes.length === 0) return;
+    const minX = Math.min(...boxes.map((b) => b.x));
+    const minY = Math.min(...boxes.map((b) => b.y));
+    const maxX = Math.max(...boxes.map((b) => b.x + b.w));
+    const maxY = Math.max(...boxes.map((b) => b.y + b.h));
     const r = el.getBoundingClientRect();
     const k = Math.max(0.2, Math.min(1.2, (r.width - 60) / (maxX - minX), (r.height - 60) / (maxY - minY)));
     setView({ k, x: (r.width - (maxX - minX) * k) / 2 - minX * k, y: Math.max(20, (r.height - (maxY - minY) * k) / 2) - minY * k });
@@ -276,7 +333,7 @@ export default function SignalPage() {
       }
       if (!sel || (e.key !== "Delete" && e.key !== "Backspace")) return;
       e.preventDefault();
-      commit(sel.type === "node" ? removeNode(dRef.current, sel.id) : removeEdge(dRef.current, sel.id));
+      commit(removeSelected(dRef.current, sel));
       setSel(null);
     };
     window.addEventListener("keydown", onKey);
@@ -292,6 +349,34 @@ export default function SignalPage() {
     if (!n) return;
     const p = toCanvas(e);
     action.current = { mode: "node", id, dx: p.x - n.x, dy: p.y - n.y, moved: false, sx: e.clientX, sy: e.clientY, snapshot: dRef.current };
+    wrap.current?.setPointerCapture(e.pointerId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const onZoneDown = useCallback((e: React.PointerEvent, id: string) => {
+    e.stopPropagation();
+    const z = dRef.current.zones.find((x) => x.id === id);
+    if (!z) return;
+    const p = toCanvas(e);
+    action.current = { mode: "zone", id, dx: p.x - z.x, dy: p.y - z.y, moved: false, sx: e.clientX, sy: e.clientY, snapshot: dRef.current, carry: nodesInZone(dRef.current, id) };
+    wrap.current?.setPointerCapture(e.pointerId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const onZoneSizeDown = useCallback((e: React.PointerEvent, id: string) => {
+    e.stopPropagation();
+    const z = dRef.current.zones.find((x) => x.id === id);
+    if (!z) return;
+    action.current = { mode: "zoneSize", id, moved: false, sx: e.clientX, sy: e.clientY, snapshot: dRef.current, ox: z.x, oy: z.y };
+    wrap.current?.setPointerCapture(e.pointerId);
+  }, []);
+
+  const onNoteDown = useCallback((e: React.PointerEvent, id: string) => {
+    e.stopPropagation();
+    const n = dRef.current.notes.find((x) => x.id === id);
+    if (!n) return;
+    const p = toCanvas(e);
+    action.current = { mode: "note", id, dx: p.x - n.x, dy: p.y - n.y, moved: false, sx: e.clientX, sy: e.clientY, snapshot: dRef.current };
     wrap.current?.setPointerCapture(e.pointerId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -331,6 +416,30 @@ export default function SignalPage() {
       const x = Math.max(0, snapV(p.x - a.dx, e.altKey));
       const y = Math.max(0, snapV(p.y - a.dy, e.altKey));
       schedule(() => setD((cur) => moveNode(cur, a.id, x, y)));
+    } else if (a.mode === "zone") {
+      if (!a.moved && Math.hypot(e.clientX - a.sx, e.clientY - a.sy) < 4) return;
+      if (!a.moved) pushHistory(a.snapshot);
+      a.moved = true;
+      const p = toCanvas(e);
+      const x = Math.max(0, snapV(p.x - a.dx, e.altKey));
+      const y = Math.max(0, snapV(p.y - a.dy, e.altKey));
+      schedule(() => setD((cur) => moveZone(cur, a.id, x, y, a.carry)));
+    } else if (a.mode === "zoneSize") {
+      if (!a.moved && Math.hypot(e.clientX - a.sx, e.clientY - a.sy) < 4) return;
+      if (!a.moved) pushHistory(a.snapshot);
+      a.moved = true;
+      const p = toCanvas(e);
+      const w = snapV(p.x - a.ox, e.altKey);
+      const h = snapV(p.y - a.oy, e.altKey);
+      schedule(() => setD((cur) => resizeZone(cur, a.id, w, h)));
+    } else if (a.mode === "note") {
+      if (!a.moved && Math.hypot(e.clientX - a.sx, e.clientY - a.sy) < 4) return;
+      if (!a.moved) pushHistory(a.snapshot);
+      a.moved = true;
+      const p = toCanvas(e);
+      const x = Math.max(0, snapV(p.x - a.dx, e.altKey));
+      const y = Math.max(0, snapV(p.y - a.dy, e.altKey));
+      schedule(() => setD((cur) => moveNote(cur, a.id, x, y)));
     } else {
       const p = toCanvas(e);
       schedule(() => setWire({ node: a.node, port: a.port, x: p.x, y: p.y }));
@@ -352,6 +461,10 @@ export default function SignalPage() {
       if (!a.moved) setSel(null);
     } else if (a.mode === "node") {
       if (!a.moved) setSel({ type: "node", id: a.id });
+    } else if (a.mode === "zone" || a.mode === "zoneSize") {
+      if (!a.moved) setSel({ type: "zone", id: a.id });
+    } else if (a.mode === "note") {
+      if (!a.moved) setSel({ type: "note", id: a.id });
     } else {
       setWire(null);
       const p = toCanvas(e);
@@ -388,6 +501,8 @@ export default function SignalPage() {
 
   const node = sel?.type === "node" ? d.nodes.find((n) => n.id === sel.id) : undefined;
   const edge = sel?.type === "edge" ? d.edges.find((e) => e.id === sel.id) : undefined;
+  const zone = sel?.type === "zone" ? d.zones.find((z) => z.id === sel.id) : undefined;
+  const note = sel?.type === "note" ? d.notes.find((n) => n.id === sel.id) : undefined;
   const byId = useMemo(() => new Map(d.nodes.map((n) => [n.id, n])), [d.nodes]);
   const busy = useMemo(() => {
     const m = new Map<string, string>();
@@ -407,6 +522,23 @@ export default function SignalPage() {
     const at = freeSpot(d, snapV(cx - NODE_W / 2, false), snapV(cy - 40, false), kind);
     commit(moveNode(r.diagram, r.id, at.x, at.y));
     setSel({ type: "node", id: r.id });
+  };
+
+  const centre = () => {
+    const el = wrap.current?.getBoundingClientRect();
+    return { x: el ? (el.width / 2 - view.x) / view.k : 200, y: el ? (el.height / 2 - view.y) / view.k : 150 };
+  };
+  const addZoneHere = () => {
+    const c = centre();
+    const r = addZone(d, Math.max(0, snapV(c.x - 190, false)), Math.max(0, snapV(c.y - 130, false)), `Zone ${d.zones.length + 1}`);
+    commit(r.diagram);
+    setSel({ type: "zone", id: r.id });
+  };
+  const addNoteHere = () => {
+    const c = centre();
+    const r = addNote(d, Math.max(0, snapV(c.x - NOTE_W / 2 + (d.notes.length % 5) * 20, false)), Math.max(0, snapV(c.y - 30 + (d.notes.length % 5) * 20, false)), "Note");
+    commit(r.diagram);
+    setSel({ type: "note", id: r.id });
   };
 
   const addFromLibrary = (i: number) => {
@@ -461,6 +593,12 @@ export default function SignalPage() {
                 {k.label}
               </button>
             ))}
+            <button type="button" className={`btn ${small}`} onClick={addZoneHere}>
+              Zone
+            </button>
+            <button type="button" className={`btn ${small}`} onClick={addNoteHere}>
+              Note
+            </button>
             <select className="input !w-auto !py-1.5 text-sm" aria-label="Add from library" value="" onChange={(e) => e.target.value !== "" && addFromLibrary(Number(e.target.value))}>
               <option value="">From library…</option>
               {library.map((p, i) => (
@@ -514,7 +652,7 @@ export default function SignalPage() {
             onPointerUp={onUp}
             onPointerCancel={onUp}
           >
-            {d.nodes.length === 0 && (
+            {d.nodes.length === 0 && d.zones.length === 0 && d.notes.length === 0 && (
               <p className="absolute inset-0 grid place-items-center p-6 text-center text-sm text-zinc-500">
                 Nothing here yet. Add gear above, or bring in your LED screens from PixelPlan.
               </p>
@@ -527,6 +665,9 @@ export default function SignalPage() {
               </defs>
               <rect width="100%" height="100%" fill="url(#sg)" />
               <g transform={`translate(${view.x} ${view.y}) scale(${view.k})`}>
+                {d.zones.map((z) => (
+                  <ZoneView key={z.id} z={z} selected={sel?.type === "zone" && sel.id === z.id} onDown={onZoneDown} onSizeDown={onZoneSizeDown} />
+                ))}
                 {d.edges.map((e) => {
                   const a = byId.get(e.from);
                   const b = byId.get(e.to);
@@ -534,6 +675,9 @@ export default function SignalPage() {
                 })}
                 {d.nodes.map((n) => (
                   <NodeView key={n.id} n={n} selected={sel?.type === "node" && sel.id === n.id} wiring={wiring} busyIn={busy.get(n.id) ?? ""} onDown={onNodeDown} onPortDown={onPortDown} />
+                ))}
+                {d.notes.map((n) => (
+                  <NoteView key={n.id} n={n} selected={sel?.type === "note" && sel.id === n.id} onDown={onNoteDown} />
                 ))}
                 {wire &&
                   (() => {
@@ -549,8 +693,46 @@ export default function SignalPage() {
 
           <aside className="space-y-3" aria-label="Details">
             <div className="panel space-y-3">
-              <h2 className="panel-title">{node ? "Box" : edge ? "Cable" : "New cables"}</h2>
-              {!node && !edge && (
+              <h2 className="panel-title">{node ? "Box" : edge ? "Cable" : zone ? "Zone" : note ? "Note" : "New cables"}</h2>
+              {zone && (
+                <>
+                  <label className="block text-xs text-zinc-400">
+                    Name
+                    <input className="input mt-1 w-full" value={zone.label} aria-label="Zone name" onFocus={() => pushHistory()} onChange={(e) => setD(updateZone(d, zone.id, { label: e.target.value }))} />
+                  </label>
+                  <Select label="Colour" value={zone.colour} onChange={(v) => commit(updateZone(d, zone.id, { colour: v as ZoneColour }))} options={(Object.keys(zoneColours) as ZoneColour[]).map((c) => ({ value: c, label: c[0].toUpperCase() + c.slice(1) }))} />
+                  <p className="text-xs text-zinc-500">Drag the coloured bar to move the zone and the boxes inside it. Drag the corner square to resize.</p>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => {
+                      commit(removeZone(d, zone.id));
+                      setSel(null);
+                    }}
+                  >
+                    Delete zone
+                  </button>
+                </>
+              )}
+              {note && (
+                <>
+                  <label className="block text-xs text-zinc-400">
+                    Text
+                    <textarea className="input mt-1 w-full" rows={5} value={note.text} aria-label="Note text" onFocus={() => pushHistory()} onChange={(e) => setD(updateNote(d, note.id, e.target.value))} />
+                  </label>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => {
+                      commit(removeNote(d, note.id));
+                      setSel(null);
+                    }}
+                  >
+                    Delete note
+                  </button>
+                </>
+              )}
+              {!node && !edge && !zone && !note && (
                 <>
                   <Select label="Cable type" value={cable} onChange={(v) => setCable(v as Cable)} options={cables.map((c) => ({ value: c, label: c }))} />
                   <Select label="Signal" value={format} onChange={(v) => setFormat(v as Format)} options={formats.map((c) => ({ value: c, label: c }))} />
@@ -711,7 +893,7 @@ export default function SignalPage() {
                   setTimeout(() => setClearAsk(false), 4000);
                   return;
                 }
-                commit({ nodes: [], edges: [] });
+                commit(emptyDiagram());
                 setSel(null);
                 setClearAsk(false);
               }}
