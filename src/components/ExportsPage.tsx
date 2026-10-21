@@ -2,6 +2,8 @@ import { useState } from "react";
 import type { ReportData } from "../utils/reportPdf";
 import { PIXERA_MAX_PIXELS, patchNprj, pixeraCsvParts, screenObj, vmpCabinets, vmpLayoutJson } from "../utils/vmp";
 import { Select } from "./ui";
+import { resolumeXml } from "../utils/resolumeXml";
+import { downloadXml } from "../utils/sharedCanvas";
 
 function save(data: BlobPart, name: string, type: string) {
   const url = URL.createObjectURL(new Blob([data], { type }));
@@ -49,7 +51,36 @@ export default function ExportsPage({ data }: { data: ReportData }) {
       )}
 
       <div className="panel">
-        <h2 className="panel-title">Media server</h2>
+        <h2 className="panel-title">Media server: Resolume Arena</h2>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="btn"
+            disabled={!s.canvas}
+            onClick={() => {
+              const w = s.canvas?.width ?? 0;
+              const h = s.canvas?.height ?? 0;
+              const nm = s.screenName || "LED wall";
+              downloadXml(
+                resolumeXml({ name: nm, canvasWidth: w, canvasHeight: h, outputWidth: w, outputHeight: h, across: 1, down: 1, slices: [{ name: nm, x: 0, y: 0, w, h }] }),
+                `${base}-resolume`
+              );
+            }}
+          >
+            Resolume Advanced Output XML
+          </button>
+        </div>
+        <p className="mt-2 text-xs text-zinc-500">
+          This screen on its own output, as one slice. To put several screens on shared canvases with several outputs, use the Resolume XML buttons under{" "}
+          <a className="underline" href="#/canvas">
+            Canvas
+          </a>
+          , in "All screens on one canvas".
+        </p>
+      </div>
+
+      <div className="panel">
+        <h2 className="panel-title">Media server: mesh and Pixera</h2>
         <h3 className="text-xs font-medium text-zinc-300">Screen mesh</h3>
         <div className="mt-1 flex flex-wrap gap-2">
           <button type="button" className="btn" onClick={() => save(screenObj(s), `${base}-mesh.obj`, "text/plain")}>
