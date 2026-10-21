@@ -91,6 +91,7 @@ const initial: ProjectFile = sharedAtStart ?? loadSaved() ?? emptyProject();
 
 // Heavy pages (PDF building, the test pattern) load on demand.
 const EngineeringReport = lazy(() => import("./components/EngineeringReport"));
+const ExportsPage = lazy(() => import("./components/ExportsPage"));
 const CanvasPage = lazy(() => import("./components/CanvasPage"));
 
 function App() {
@@ -582,7 +583,7 @@ function App() {
   const changesKey = lastSaved ? `${lastSaved.id}|${JSON.stringify(changeList)}` : "";
 
   const reportData = useMemo<ReportData | null>(() => {
-    if (page !== "report") return null;
+    if (page !== "report" && page !== "exports") return null;
     const list = screens.map((x, i) => buildScreenReport(x, all[i], ctx, pickLists[i]));
     return { ...list[0], pickList: pickItems, cables: cableRows, pricing: { currency: pickSettings.currency, days: pickSettings.days }, extraScreens: list.slice(1), distro: distroPlan ? { plan: distroPlan, settings: distro } : null, changes: lastSaved ? { since: lastSaved.label, items: changeList } : null };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1022,6 +1023,10 @@ function App() {
       );
       break;
 
+    case "exports":
+      body = needsPanel(reportData ? <ExportsPage data={reportData} /> : null);
+      break;
+
     case "report":
       body = needsPanel(reportData ? <EngineeringReport data={reportData} /> : null);
       break;
@@ -1174,7 +1179,7 @@ function App() {
             onUnits={setUnitsState}
           />
 
-          {page !== "project" && page !== "report" && (
+          {page !== "project" && page !== "report" && page !== "exports" && (
             <ScreenBar
               screens={screens.map((x, i) => ({
                 id: x.id,

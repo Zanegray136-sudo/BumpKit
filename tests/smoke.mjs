@@ -7,7 +7,7 @@ import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { chromium } from "playwright";
 
-const PAGES = ["project", "screen", "data", "canvas", "power", "distro", "rigging", "cables", "picklist", "report"];
+const PAGES = ["project", "screen", "data", "canvas", "power", "distro", "rigging", "cables", "picklist", "exports", "report"];
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".webmanifest": "application/manifest+json", ".woff2": "font/woff2" };
 
 let server;

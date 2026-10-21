@@ -8,6 +8,7 @@ export type PageId =
   | "rigging"
   | "cables"
   | "picklist"
+  | "exports"
   | "report";
 
 export type Page = {
@@ -80,6 +81,13 @@ export const pages: Page[] = [
     title: "Pick list",
     description:
       "Everything to pack for the wall, worked out from your data and power plans. Tick items off as you pick them.",
+  },
+  {
+    id: "exports",
+    label: "Exports",
+    title: "Media server / Processor exports",
+    description:
+      "Files for your media server and LED processor: a screen mesh, a Pixera pixel map and NovaStar VMP layouts.",
   },
   {
     id: "report",
