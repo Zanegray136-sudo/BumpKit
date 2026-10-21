@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
 import { avGear, genericGear, portSummary, presetOf } from "../data/avGear";
 import { processors } from "../data/processors";
-import { kinds, type NodeKind, type Preset } from "../utils/signal";
+import { cables, kinds, type Cable, type NodeKind, type Preset } from "../utils/signal";
+import type { GearSet } from "../utils/signalSaved";
+import { parseGear } from "../utils/gearLibrary";
 
 type Item = { key: string; preset: Preset; brand: string; group: string; summary: string; note?: string; source?: string };
 
@@ -21,19 +23,19 @@ const groupOf: Record<NodeKind, string> = {
 
 /** What a drag from this panel carries. The canvas reads it on drop. */
 export const DRAG_TYPE = "application/x-bumpkit-gear";
-export type Dragged = { preset: Preset } | { kind: NodeKind };
+export type Dragged = { preset: Preset } | { kind: NodeKind } | { set: string };
 
 const startDrag = (e: React.DragEvent, d: Dragged) => {
   e.dataTransfer.setData(DRAG_TYPE, JSON.stringify(d));
-  e.dataTransfer.setData("text/plain", "preset" in d ? d.preset.name : d.kind);
+  e.dataTransfer.setData("text/plain", "preset" in d ? d.preset.name : "kind" in d ? d.kind : d.set);
   e.dataTransfer.effectAllowed = "copy";
 };
 
-const order = ["My gear", "Switchers", "Media servers", "Routers", "Network", "Control", "LED processors", "Converters", "Sources", "Cameras", "Displays"];
+const order = ["My gear", "Sets", "Switchers", "Media servers", "Routers", "Network", "Control", "LED processors", "Converters", "Sources", "Cameras", "Displays"];
 
 function build(mine: Preset[]): Item[] {
   const out: Item[] = [];
-  mine.forEach((p) => out.push({ key: `m:${p.name}`, preset: p, brand: "Saved by you", group: "My gear", summary: portSummary(p) }));
+  mine.forEach((p) => out.push({ key: `m:${p.name}`, preset: p, brand: "Saved by you", group: "My gear", summary: portSummary(p), note: p.note, source: p.source }));
   [...avGear, ...genericGear].forEach((g) => {
     const preset = presetOf(g);
     out.push({ key: `g:${preset.name}`, preset, brand: g.brand, group: groupOf[g.kind], summary: portSummary(preset), note: g.note, source: g.source || undefined });
@@ -45,11 +47,86 @@ function build(mine: Preset[]): Item[] {
   return out;
 }
 
-export function GearPanel({ mine, onAdd, onBlank, onRemoveMine }: { mine: Preset[]; onAdd: (p: Preset) => void; onBlank: (k: NodeKind) => void; onRemoveMine: (name: string) => void }) {
+type Props = {
+  mine: Preset[];
+  sets: GearSet[];
+  onAdd: (p: Preset) => void;
+  onAddSet: (name: string) => void;
+  onBlank: (k: NodeKind) => void;
+  onRemoveMine: (name: string) => void;
+  onRemoveSet: (name: string) => void;
+  onSaveMine: (p: Preset) => void;
+};
+
+/** A small form for adding gear that isn't in the list. */
+function NewGear({ onSave, onCancel }: { onSave: (p: Preset) => void; onCancel: () => void }) {
+  const [name, setName] = useState("");
+  const [kind, setKind] = useState<NodeKind>("other");
+  const [ins, setIns] = useState(1);
+  const [outs, setOuts] = useState(1);
+  const [inType, setInType] = useState<Cable | "">("");
+  const [outType, setOutType] = useState<Cable | "">("");
+  const [url, setUrl] = useState("");
+  const draft = parseGear([{ name, kind, ins, outs, inType: inType || undefined, outType: outType || undefined, source: url }])[0];
+  const field = "input w-full !py-1 text-sm";
+  const types = (v: Cable | "", set: (c: Cable | "") => void, label: string) => (
+    <select className={field} aria-label={label} value={v} onChange={(e) => set(e.target.value as Cable | "")}>
+      <option value="">Any cable</option>
+      {cables.map((c) => (
+        <option key={c}>{c}</option>
+      ))}
+    </select>
+  );
+  return (
+    <form
+      className="space-y-2 rounded-md border border-zinc-700 bg-zinc-900 p-2.5"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!draft) return;
+        onSave(draft);
+        onCancel();
+      }}
+    >
+      <input className={field} placeholder="Name, e.g. Sony HXR-NX800" aria-label="Gear name" value={name} onChange={(e) => setName(e.target.value)} />
+      <select className={field} aria-label="Gear type" value={kind} onChange={(e) => setKind(e.target.value as NodeKind)}>
+        {kinds.map((k) => (
+          <option key={k.id} value={k.id}>
+            {k.label}
+          </option>
+        ))}
+      </select>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="text-xs text-zinc-400">
+          Inputs
+          <input className={field} type="number" min={0} max={80} value={ins} onChange={(e) => setIns(Number(e.target.value))} />
+        </label>
+        <label className="text-xs text-zinc-400">
+          Outputs
+          <input className={field} type="number" min={0} max={80} value={outs} onChange={(e) => setOuts(Number(e.target.value))} />
+        </label>
+        {types(inType, setInType, "Input cable")}
+        {types(outType, setOutType, "Output cable")}
+      </div>
+      <input className={field} placeholder="Spec sheet link (optional, https)" aria-label="Spec sheet link" value={url} onChange={(e) => setUrl(e.target.value)} />
+      <div className="flex gap-2">
+        <button type="submit" className="btn-primary !px-3 !py-1 text-sm" disabled={!draft}>
+          Save to my gear
+        </button>
+        <button type="button" className="btn !px-3 !py-1 text-sm" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
+export function GearPanel({ mine, sets, onAdd, onAddSet, onBlank, onRemoveMine, onRemoveSet, onSaveMine }: Props) {
+  const [adding, setAdding] = useState(false);
   const [q, setQ] = useState("");
   const [group, setGroup] = useState("All");
   const items = useMemo(() => build(mine), [mine]);
-  const groups = useMemo(() => ["All", ...order.filter((g) => items.some((i) => i.group === g))], [items]);
+  const setItems = sets.filter((x) => `${x.name}`.toLowerCase().includes(q.toLowerCase()) && (group === "All" || group === "Sets"));
+  const groups = useMemo(() => ["All", ...order.filter((g) => (g === "Sets" ? sets.length > 0 : items.some((i) => i.group === g)))], [items, sets]);
   const words = q.toLowerCase().split(/\s+/).filter(Boolean);
   const shown = items.filter((i) => (group === "All" || i.group === group) && words.every((w) => `${i.brand} ${i.preset.name}`.toLowerCase().includes(w)));
   const sections = order.map((g) => ({ g, rows: shown.filter((i) => i.group === g) })).filter((s) => s.rows.length);
@@ -73,8 +150,28 @@ export function GearPanel({ mine, onAdd, onBlank, onRemoveMine }: { mine: Preset
         ))}
       </div>
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1" style={{ maxHeight: "52vh" }}>
-        {sections.length === 0 && <p className="text-sm text-zinc-500">Nothing matches. Add a blank box below and set its ports yourself.</p>}
-        {sections.map((s) => (
+        {sections.length === 0 && setItems.length === 0 && <p className="text-sm text-zinc-500">Nothing matches. Add a blank box below and set its ports yourself.</p>}
+        {setItems.length > 0 && (
+          <section>
+            <h3 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Sets</h3>
+            <ul className="space-y-1">
+              {setItems.map((x) => (
+                <li key={x.name} className="flex items-stretch gap-1">
+                  <button type="button" draggable onDragStart={(e) => startDrag(e, { set: x.name })} onClick={() => onAddSet(x.name)} title="Drag onto the diagram, or click to add the whole set." className="min-w-0 flex-1 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 text-left hover:border-zinc-600">
+                    <span className="block truncate text-sm text-zinc-100">{x.name}</span>
+                    <span className="block truncate text-xs text-zinc-500">
+                      {x.fragment.nodes.length} boxes, {x.fragment.edges.length} cables
+                    </span>
+                  </button>
+                  <button type="button" className="w-7 shrink-0 rounded-md border border-zinc-800 text-xs text-zinc-500 hover:text-zinc-100" aria-label={`Remove set ${x.name}`} onClick={() => onRemoveSet(x.name)}>
+                    ✕
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+        {sections.filter((x) => x.g !== "Sets").map((s) => (
           <section key={s.g}>
             <h3 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">{s.g}</h3>
             <ul className="space-y-1">
@@ -103,6 +200,13 @@ export function GearPanel({ mine, onAdd, onBlank, onRemoveMine }: { mine: Preset
           </section>
         ))}
       </div>
+      {adding ? (
+        <NewGear onSave={onSaveMine} onCancel={() => setAdding(false)} />
+      ) : (
+        <button type="button" className="btn !py-1.5 text-sm" onClick={() => setAdding(true)}>
+          + Add my own gear
+        </button>
+      )}
       <div className="border-t border-zinc-800 pt-3">
         <p className="mb-1.5 text-xs text-zinc-400">Blank box</p>
         <div className="flex flex-wrap gap-1.5">

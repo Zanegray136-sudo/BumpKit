@@ -1,10 +1,13 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Select } from "./ui";
 import { DRAG_TYPE, GearPanel, type Dragged } from "./GearPanel";
+import { SignalTools } from "./SignalTools";
+import { addSet, addVersion, loadSets, loadVersions, removeSet, removeVersion, saveSets, saveVersions, type GearSet, type Version } from "../utils/signalSaved";
+import { alignNodes, copyNodes, distributeNodes, drawioXml, duplicateNodes, importBoxesCsv, moveNodes, nodesInRect, patchNode, pasteFragment, removeNodes, tracePath, type AlignMode, type Fragment } from "../utils/signalTools";
 import { loadSaved } from "../utils/projectFile";
 import { addGear, loadGear, parseGear, presetFromNode, processorPorts, removeGear, saveGear } from "../utils/gearLibrary";
 import { downloadSignalPdf } from "../utils/signalPdf";
-import { downloadCombinedPng, downloadCombinedSvg, downloadCsv } from "../utils/sharedCanvas";
+import { downloadCombinedPng, downloadCombinedSvg, downloadCsv, downloadFile } from "../utils/sharedCanvas";
 import {
   NODE_W,
   addNode,
@@ -43,6 +46,7 @@ import {
   kindLabel,
   kinds,
   loadDiagram,
+  isIpv4,
   moveNode,
   nodeHeight,
   patchCsv,
@@ -77,6 +81,8 @@ type Action =
   | { mode: "zone"; id: string; dx: number; dy: number; moved: boolean; sx: number; sy: number; snapshot: Diagram; carry: string[] }
   | { mode: "zoneSize"; id: string; moved: boolean; sx: number; sy: number; snapshot: Diagram; ox: number; oy: number }
   | { mode: "note"; id: string; dx: number; dy: number; moved: boolean; sx: number; sy: number; snapshot: Diagram }
+  | { mode: "group"; ids: string[]; lastX: number; lastY: number; moved: boolean; sx: number; sy: number; snapshot: Diagram; clickId: string }
+  | { mode: "marquee"; x0: number; y0: number }
   | { mode: "pan"; sx: number; sy: number; vx: number; vy: number; moved: boolean }
   | null;
 
@@ -85,11 +91,13 @@ const NodeView = memo(function NodeView({
   selected,
   wiring,
   busyIn,
+  dim,
   onDown,
   onPortDown,
 }: {
   n: SigNode;
   selected: boolean;
+  dim: boolean;
   wiring: boolean;
   busyIn: string;
   onDown: (e: React.PointerEvent, id: string) => void;
@@ -98,11 +106,25 @@ const NodeView = memo(function NodeView({
   const h = nodeHeight(n);
   const busy = new Set(busyIn.split(",").filter(Boolean).map(Number));
   return (
-    <g onPointerDown={(e) => onDown(e, n.id)} style={{ cursor: "grab" }}>
+    <g onPointerDown={(e) => onDown(e, n.id)} style={{ cursor: "grab" }} opacity={dim ? 0.25 : 1}>
       <rect x={n.x} y={n.y} width={NODE_W} height={h} rx={8} fill="#f4f4f5" stroke={selected ? "#2563eb" : "#3f3f46"} strokeWidth={selected ? 3 : 1.5} />
       <text x={n.x + 22} y={n.y + 16} fontSize={10} fill="#71717a" pointerEvents="none">
         {kindLabel(n.kind).toUpperCase()}
       </text>
+      {n.ip && (
+        <text x={n.x + NODE_W - 8} y={n.y + 16} fontSize={9} textAnchor="end" fill="#52525b" pointerEvents="none">
+          {n.ip}
+        </text>
+      )}
+      {n.flag && (
+        <g pointerEvents="none">
+          <title>{n.flag}</title>
+          <circle cx={n.x + NODE_W} cy={n.y} r={10} fill="#dc2626" stroke="#fff" strokeWidth={2} />
+          <text x={n.x + NODE_W} y={n.y + 4} fontSize={12} fontWeight={700} textAnchor="middle" fill="#fff">
+            !
+          </text>
+        </g>
+      )}
       {labelLines(n.label).map((l, i) => (
         <text key={i} x={n.x + 22} y={n.y + 38 + i * 14} fontSize={12} fontWeight={600} fill="#18181b" pointerEvents="none">
           {l}
@@ -138,12 +160,12 @@ const NodeView = memo(function NodeView({
   );
 });
 
-const EdgeView = memo(function EdgeView({ e, a, b, selected, onSelect }: { e: SigEdge; a: SigNode; b: SigNode; selected: boolean; onSelect: (id: string) => void }) {
+const EdgeView = memo(function EdgeView({ e, a, b, selected, dim, onSelect }: { e: SigEdge; a: SigNode; b: SigNode; selected: boolean; dim: boolean; onSelect: (id: string) => void }) {
   const p = edgePath(a, e.fromPort, b, e.toPort);
   const col = cableColour[e.cable];
   const text = edgeText(e);
   return (
-    <g onPointerDown={(ev) => ev.stopPropagation()} onClick={() => onSelect(e.id)} style={{ cursor: "pointer" }}>
+    <g onPointerDown={(ev) => ev.stopPropagation()} onClick={() => onSelect(e.id)} style={{ cursor: "pointer" }} opacity={dim ? 0.2 : 1}>
       <path d={p.d} fill="none" stroke="transparent" strokeWidth={14} />
       <path d={p.d} fill="none" stroke={col} strokeWidth={selected ? 4.5 : 2.5} />
       <rect x={p.mx - text.length * 3.2 - 6} y={p.my - 10} width={text.length * 6.4 + 12} height={20} rx={4} fill="#fff" stroke={col} strokeWidth={selected ? 2 : 1} />
@@ -198,9 +220,19 @@ export default function SignalPage() {
   const [clearAsk, setClearAsk] = useState(false);
   const [fitTick, setFitTick] = useState(1);
   const [gear, setGear] = useState<Preset[]>(loadGear);
+  const [multi, setMulti] = useState<string[]>([]);
+  const [marquee, setMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
+  const [trace, setTrace] = useState(true);
+  const [versions, setVersions] = useState<Version[]>(loadVersions);
+  const [sets, setSets] = useState<GearSet[]>(loadSets);
+  const clip = useRef<Fragment | null>(null);
+  const pastes = useRef(0);
+  const csvInput = useRef<HTMLInputElement>(null);
 
   const wrap = useRef<HTMLDivElement>(null);
   const dRef = useRef(d);
+  const multiRef = useRef<string[]>([]);
+  const selRef = useRef<Sel>(null);
   const viewRef = useRef(view);
   const action = useRef<Action>(null);
   const hist = useRef<{ past: Diagram[]; future: Diagram[] }>({ past: [], future: [] });
@@ -208,6 +240,8 @@ export default function SignalPage() {
   const pending = useRef<(() => void) | null>(null);
   const [, bump] = useState(0);
   dRef.current = d;
+  multiRef.current = multi;
+  selRef.current = sel;
   viewRef.current = view;
 
   const schedule = (f: () => void) => {
@@ -338,9 +372,52 @@ export default function SignalPage() {
         redo();
         return;
       }
-      if (!sel || (e.key !== "Delete" && e.key !== "Backspace")) return;
+      const ids = multiRef.current.length > 1 ? multiRef.current : selRef.current?.type === "node" ? [selRef.current.id] : [];
+      if (mod && e.key.toLowerCase() === "a") {
+        e.preventDefault();
+        chooseNodes(dRef.current.nodes.map((n) => n.id));
+        return;
+      }
+      if (mod && e.key.toLowerCase() === "c" && ids.length) {
+        e.preventDefault();
+        clip.current = copyNodes(dRef.current, ids);
+        pastes.current = 0;
+        flash(`Copied ${ids.length} box${ids.length === 1 ? "" : "es"}. Ctrl or ⌘ + V to paste.`);
+        return;
+      }
+      if (mod && e.key.toLowerCase() === "v" && clip.current) {
+        e.preventDefault();
+        pastes.current++;
+        const f = clip.current;
+        const minX = Math.min(...f.nodes.map((n) => n.x));
+        const minY = Math.min(...f.nodes.map((n) => n.y));
+        const r = pasteFragment(dRef.current, f, minX + 40 * pastes.current, minY + 40 * pastes.current);
+        commit(r.diagram);
+        chooseNodes(r.ids);
+        return;
+      }
+      if (mod && e.key.toLowerCase() === "d" && ids.length) {
+        e.preventDefault();
+        const r = duplicateNodes(dRef.current, ids);
+        commit(r.diagram);
+        chooseNodes(r.ids);
+        return;
+      }
+      if (e.key === "Escape") {
+        setSel(null);
+        setMulti([]);
+        return;
+      }
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      if (multiRef.current.length > 1) {
+        e.preventDefault();
+        commit(removeNodes(dRef.current, multiRef.current));
+        setMulti([]);
+        return;
+      }
+      if (!selRef.current) return;
       e.preventDefault();
-      commit(removeSelected(dRef.current, sel));
+      commit(removeSelected(dRef.current, selRef.current));
       setSel(null);
     };
     window.addEventListener("keydown", onKey);
@@ -350,12 +427,33 @@ export default function SignalPage() {
 
   const snapV = (v: number, alt: boolean) => (snap && !alt ? Math.round(v / GRID) * GRID : Math.round(v));
 
+  const chooseNodes = useCallback((ids: string[]) => {
+    if (ids.length >= 2) {
+      setMulti(ids);
+      setSel(null);
+    } else {
+      setMulti([]);
+      setSel(ids.length === 1 ? { type: "node", id: ids[0] } : null);
+    }
+  }, []);
+
   const onNodeDown = useCallback((e: React.PointerEvent, id: string) => {
     e.stopPropagation();
-    const n = dRef.current.nodes.find((x) => x.id === id);
+    const cur = dRef.current;
+    const n = cur.nodes.find((x) => x.id === id);
     if (!n) return;
+    if (e.shiftKey || e.metaKey || e.ctrlKey) {
+      const have = multiRef.current.length > 1 ? multiRef.current : selRef.current?.type === "node" ? [selRef.current.id] : [];
+      chooseNodes(have.includes(id) ? have.filter((x) => x !== id) : [...have, id]);
+      return;
+    }
     const p = toCanvas(e);
-    action.current = { mode: "node", id, dx: p.x - n.x, dy: p.y - n.y, moved: false, sx: e.clientX, sy: e.clientY, snapshot: dRef.current };
+    if (multiRef.current.length > 1 && multiRef.current.includes(id)) {
+      action.current = { mode: "group", ids: multiRef.current, lastX: p.x, lastY: p.y, moved: false, sx: e.clientX, sy: e.clientY, snapshot: cur, clickId: id };
+    } else {
+      setMulti([]);
+      action.current = { mode: "node", id, dx: p.x - n.x, dy: p.y - n.y, moved: false, sx: e.clientX, sy: e.clientY, snapshot: cur };
+    }
     wrap.current?.setPointerCapture(e.pointerId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -402,6 +500,13 @@ export default function SignalPage() {
   const onSelectEdge = useCallback((id: string) => setSel({ type: "edge", id }), []);
 
   const onBgDown = (e: React.PointerEvent) => {
+    if (e.shiftKey) {
+      const p = toCanvas(e);
+      action.current = { mode: "marquee", x0: p.x, y0: p.y };
+      setMarquee({ x0: p.x, y0: p.y, x1: p.x, y1: p.y });
+      wrap.current?.setPointerCapture(e.pointerId);
+      return;
+    }
     action.current = { mode: "pan", sx: e.clientX, sy: e.clientY, vx: viewRef.current.x, vy: viewRef.current.y, moved: false };
     wrap.current?.setPointerCapture(e.pointerId);
   };
@@ -415,6 +520,17 @@ export default function SignalPage() {
       const nx = a.vx + e.clientX - a.sx;
       const ny = a.vy + e.clientY - a.sy;
       schedule(() => setView((v) => ({ ...v, x: nx, y: ny })));
+    } else if (a.mode === "marquee") {
+      const p = toCanvas(e);
+      schedule(() => setMarquee({ x0: a.x0, y0: a.y0, x1: p.x, y1: p.y }));
+    } else if (a.mode === "group") {
+      if (!a.moved && Math.hypot(e.clientX - a.sx, e.clientY - a.sy) < 4) return;
+      if (!a.moved) pushHistory(a.snapshot);
+      a.moved = true;
+      const p = toCanvas(e);
+      const dx = snapV(p.x - a.lastX, e.altKey);
+      const dy = snapV(p.y - a.lastY, e.altKey);
+      schedule(() => setD(moveNodes(a.snapshot, a.ids, dx, dy)));
     } else if (a.mode === "node") {
       if (!a.moved && Math.hypot(e.clientX - a.sx, e.clientY - a.sy) < 4) return;
       if (!a.moved) pushHistory(a.snapshot);
@@ -465,7 +581,16 @@ export default function SignalPage() {
     }
     if (!a) return;
     if (a.mode === "pan") {
-      if (!a.moved) setSel(null);
+      if (!a.moved) {
+        setSel(null);
+        setMulti([]);
+      }
+    } else if (a.mode === "marquee") {
+      const p = toCanvas(e);
+      setMarquee(null);
+      chooseNodes(nodesInRect(dRef.current, a.x0, a.y0, p.x, p.y));
+    } else if (a.mode === "group") {
+      if (!a.moved) chooseNodes([a.clickId]);
     } else if (a.mode === "node") {
       if (!a.moved) setSel({ type: "node", id: a.id });
     } else if (a.mode === "zone" || a.mode === "zoneSize") {
@@ -518,6 +643,62 @@ export default function SignalPage() {
   }, [d]);
   const checks = useMemo(() => diagramChecks(d), [d]);
   const wiring = wire !== null;
+
+  const multiSet = useMemo(() => new Set(multi), [multi]);
+  const traced = useMemo(() => {
+    if (!trace || sel?.type !== "node") return null;
+    const t = tracePath(d, sel.id);
+    return { t, nodes: new Set([sel.id, ...t.up, ...t.down]), edges: new Set([...t.upEdges, ...t.downEdges]) };
+  }, [d, sel, trace]);
+
+  const saveVersion = (name: string) => {
+    const next = addVersion(versions, name, d, Date.now());
+    setVersions(next);
+    saveVersions(next);
+    flash(`Saved "${next[0].name}".`);
+  };
+  const restoreVersion = (v: Version) => {
+    commit(v.diagram);
+    setSel(null);
+    setMulti([]);
+    setFitTick((t) => t + 1);
+    flash(`Restored "${v.name}". Undo brings your last version back.`);
+  };
+  const deleteVersion = (id: string) => {
+    const next = removeVersion(versions, id);
+    setVersions(next);
+    saveVersions(next);
+  };
+  const saveSet = (name: string) => {
+    if (multi.length < 2 || !name.trim()) return;
+    const next = addSet(sets, name, copyNodes(d, multi));
+    setSets(next);
+    saveSets(next);
+    flash(`Saved the set "${name.trim()}". Find it in the gear list under Sets.`);
+  };
+  const dropFragment = (f: Fragment, x: number, y: number) => {
+    const r = pasteFragment(d, f, x, y);
+    commit(r.diagram);
+    chooseNodes(r.ids);
+  };
+  const addSetHere = (name: string) => {
+    const f = sets.find((x) => x.name === name)?.fragment;
+    if (!f) return;
+    const c = centre();
+    dropFragment(f, Math.max(0, snapV(c.x - 200, false)), Math.max(0, snapV(c.y - 100, false)));
+  };
+  const importCsv = async (file: File) => {
+    const text = await file.text();
+    const c = centre();
+    const r = importBoxesCsv(d, text, Math.max(0, snapV(c.x - 300, false)), Math.max(0, snapV(c.y - 150, false)));
+    if (r.added === 0) flash("Couldn't find any boxes. The first row needs a Name column. Optional: Type, Inputs, Outputs, IP.");
+    else {
+      commit(r.diagram);
+      setFitTick((t) => t + 1);
+      flash(`Added ${r.added} box${r.added === 1 ? "" : "es"}${r.skipped ? `, skipped ${r.skipped} with no name` : ""}.`);
+    }
+  };
+  const align = (m: AlignMode) => commit(alignNodes(d, multi, m));
 
   const addAt = (kind: NodeKind) => {
     const r = addNode(d, kind, 0, 0);
@@ -582,8 +763,13 @@ export default function SignalPage() {
     }
     const preset = "preset" in item ? parseGear([item.preset])[0] : undefined;
     const kind = "kind" in item && kinds.some((k) => k.id === item.kind) ? item.kind : undefined;
-    if (!preset && !kind) return;
+    const set = "set" in item ? sets.find((x) => x.name === item.set) : undefined;
+    if (!preset && !kind && !set) return;
     const p = toCanvas(e);
+    if (set) {
+      dropFragment(set.fragment, Math.max(0, snapV(p.x - NODE_W / 2, e.altKey)), Math.max(0, snapV(p.y - 29, e.altKey)));
+      return;
+    }
     const x = Math.max(0, snapV(p.x - NODE_W / 2, e.altKey));
     const y = Math.max(0, snapV(p.y - 29, e.altKey));
     if (preset) {
@@ -629,6 +815,13 @@ export default function SignalPage() {
                 <button type="button" className="menu-item" disabled={d.edges.length === 0} onClick={(e) => (downloadCsv(patchCsv(d), `${base}-patch-list`), closeMenu(e))}>
                   Patch list (CSV)
                 </button>
+                <button type="button" className="menu-item" disabled={d.nodes.length === 0} onClick={(e) => (downloadFile(drawioXml(d, showName), `${base}-signal.drawio`, "application/xml"), closeMenu(e))}>
+                  draw.io file (opens in Visio too)
+                </button>
+                <hr className="my-1 border-zinc-700" />
+                <button type="button" className="menu-item" onClick={(e) => (csvInput.current?.click(), closeMenu(e))}>
+                  Import boxes from CSV…
+                </button>
               </div>
             </details>
           </div>
@@ -666,6 +859,9 @@ export default function SignalPage() {
           <label className="ml-2 flex items-center gap-1.5 text-xs text-zinc-400">
             <input type="checkbox" checked={snap} onChange={(e) => setSnap(e.target.checked)} /> Snap to grid
           </label>
+          <label className="flex items-center gap-1.5 text-xs text-zinc-400" title="Click a box to highlight everything feeding it and everything it feeds">
+            <input type="checkbox" checked={trace} onChange={(e) => setTrace(e.target.checked)} /> Trace signal path
+          </label>
         </div>
 
         {msg && (
@@ -677,6 +873,19 @@ export default function SignalPage() {
         <div className="grid gap-4 lg:grid-cols-[250px_1fr_290px]">
           <GearPanel
             mine={gear}
+            sets={sets}
+            onAddSet={addSetHere}
+            onRemoveSet={(name) => {
+              const next = removeSet(sets, name);
+              setSets(next);
+              saveSets(next);
+            }}
+            onSaveMine={(p) => {
+              const next = addGear(gear, p);
+              setGear(next);
+              saveGear(next);
+              flash(`Saved "${p.name}" to My gear.`);
+            }}
             onAdd={addFromLibrary}
             onBlank={addAt}
             onRemoveMine={(name) => {
@@ -728,14 +937,15 @@ export default function SignalPage() {
                 {d.edges.map((e) => {
                   const a = byId.get(e.from);
                   const b = byId.get(e.to);
-                  return a && b ? <EdgeView key={e.id} e={e} a={a} b={b} selected={sel?.type === "edge" && sel.id === e.id} onSelect={onSelectEdge} /> : null;
+                  return a && b ? <EdgeView key={e.id} e={e} a={a} b={b} selected={sel?.type === "edge" && sel.id === e.id} dim={traced ? !traced.edges.has(e.id) : false} onSelect={onSelectEdge} /> : null;
                 })}
                 {d.nodes.map((n) => (
-                  <NodeView key={n.id} n={n} selected={sel?.type === "node" && sel.id === n.id} wiring={wiring} busyIn={busy.get(n.id) ?? ""} onDown={onNodeDown} onPortDown={onPortDown} />
+                  <NodeView key={n.id} n={n} selected={(sel?.type === "node" && sel.id === n.id) || multiSet.has(n.id)} dim={traced ? !traced.nodes.has(n.id) : false} wiring={wiring} busyIn={busy.get(n.id) ?? ""} onDown={onNodeDown} onPortDown={onPortDown} />
                 ))}
                 {d.notes.map((n) => (
                   <NoteView key={n.id} n={n} selected={sel?.type === "note" && sel.id === n.id} onDown={onNoteDown} />
                 ))}
+                {marquee && <rect x={Math.min(marquee.x0, marquee.x1)} y={Math.min(marquee.y0, marquee.y1)} width={Math.abs(marquee.x1 - marquee.x0)} height={Math.abs(marquee.y1 - marquee.y0)} fill="#2563eb" fillOpacity={0.08} stroke="#2563eb" strokeDasharray="4 3" pointerEvents="none" />}
                 {wire &&
                   (() => {
                     const a = byId.get(wire.node);
@@ -750,7 +960,7 @@ export default function SignalPage() {
 
           <aside className="order-2 space-y-3 lg:order-none" aria-label="Details">
             <div className="panel space-y-3">
-              <h2 className="panel-title">{node ? "Box" : edge ? "Cable" : zone ? "Zone" : note ? "Note" : "New cables"}</h2>
+              <h2 className="panel-title">{multi.length > 1 ? `${multi.length} boxes selected` : node ? "Box" : edge ? "Cable" : zone ? "Zone" : note ? "Note" : "New cables"}</h2>
               {zone && (
                 <>
                   <label className="block text-xs text-zinc-400">
@@ -789,7 +999,74 @@ export default function SignalPage() {
                   </button>
                 </>
               )}
-              {!node && !edge && !zone && !note && (
+              {multi.length > 1 && (
+                <>
+                  <p className="text-xs text-zinc-400">Drag any selected box to move them all. Ctrl or ⌘ + C to copy, V to paste, D to duplicate.</p>
+                  <div>
+                    <p className="mb-1 text-xs text-zinc-400">Align</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {(
+                        [
+                          ["left", "Left"],
+                          ["centreX", "Centre"],
+                          ["right", "Right"],
+                          ["top", "Top"],
+                          ["centreY", "Middle"],
+                          ["bottom", "Bottom"],
+                        ] as [AlignMode, string][]
+                      ).map(([m, label]) => (
+                        <button key={m} type="button" className="btn !px-2 !py-1 text-xs" onClick={() => align(m)}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button type="button" className="btn !px-2 !py-1 text-xs" disabled={multi.length < 3} onClick={() => commit(distributeNodes(d, multi, "h"))}>
+                      Space across
+                    </button>
+                    <button type="button" className="btn !px-2 !py-1 text-xs" disabled={multi.length < 3} onClick={() => commit(distributeNodes(d, multi, "v"))}>
+                      Space down
+                    </button>
+                    <button
+                      type="button"
+                      className="btn !px-2 !py-1 text-xs"
+                      onClick={() => {
+                        const r = duplicateNodes(d, multi);
+                        commit(r.diagram);
+                        chooseNodes(r.ids);
+                      }}
+                    >
+                      Duplicate
+                    </button>
+                  </div>
+                  <form
+                    className="flex gap-2"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const el = e.currentTarget.elements.namedItem("setname") as HTMLInputElement;
+                      saveSet(el.value);
+                      el.value = "";
+                    }}
+                  >
+                    <input name="setname" className="input min-w-0 flex-1 !py-1 text-sm" placeholder="Save as a set, e.g. Camera rig" aria-label="Set name" />
+                    <button type="submit" className="btn !px-2 !py-1 text-xs">
+                      Save
+                    </button>
+                  </form>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => {
+                      commit(removeNodes(d, multi));
+                      setMulti([]);
+                    }}
+                  >
+                    Delete {multi.length} boxes
+                  </button>
+                </>
+              )}
+              {multi.length < 2 && !node && !edge && !zone && !note && (
                 <>
                   <Select label="Cable type" value={cable} onChange={(v) => setCable(v as Cable)} options={cables.map((c) => ({ value: c, label: c }))} />
                   <Select label="Signal" value={format} onChange={(v) => setFormat(v as Format)} options={formats.map((c) => ({ value: c, label: c }))} />
@@ -798,6 +1075,12 @@ export default function SignalPage() {
               )}
               {node && (
                 <>
+                  {traced && (
+                    <p className="rounded-md bg-blue-500/10 px-2.5 py-2 text-xs text-blue-200">
+                      {traced.t.up.length === 0 ? "Nothing feeds this box." : `Fed by ${traced.t.up.length} box${traced.t.up.length === 1 ? "" : "es"}, ${traced.t.depth} step${traced.t.depth === 1 ? "" : "s"} back${traced.t.upLength ? `, ${Math.round(traced.t.upLength * 10) / 10} m of cable` : ""}.`}{" "}
+                      {traced.t.down.length === 0 ? "It doesn't feed anything." : `Feeds ${traced.t.down.length} box${traced.t.down.length === 1 ? "" : "es"}.`}
+                    </p>
+                  )}
                   <label className="block text-xs text-zinc-400">
                     Name
                     <input className="input mt-1 w-full" value={node.label} aria-label="Box name" onFocus={() => pushHistory()} onChange={(e) => setD(renameNode(d, node.id, e.target.value))} />
@@ -806,17 +1089,41 @@ export default function SignalPage() {
                   <div className="grid grid-cols-2 gap-2">
                     <label className="block text-xs text-zinc-400">
                       Inputs
-                      <input className="input mt-1 w-full" type="number" min={0} max={32} value={node.ins} aria-label="Inputs" onChange={(e) => commit(setPorts(d, node.id, Number(e.target.value), node.outs))} />
+                      <input className="input mt-1 w-full" type="number" min={0} max={80} value={node.ins} aria-label="Inputs" onChange={(e) => commit(setPorts(d, node.id, Number(e.target.value), node.outs))} />
                     </label>
                     <label className="block text-xs text-zinc-400">
                       Outputs
-                      <input className="input mt-1 w-full" type="number" min={0} max={32} value={node.outs} aria-label="Outputs" onChange={(e) => commit(setPorts(d, node.id, node.ins, Number(e.target.value)))} />
+                      <input className="input mt-1 w-full" type="number" min={0} max={80} value={node.outs} aria-label="Outputs" onChange={(e) => commit(setPorts(d, node.id, node.ins, Number(e.target.value)))} />
                     </label>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <Select label="Input cable" value={node.inType ?? ""} onChange={(v) => commit(setPortTypes(d, node.id, (v || undefined) as Cable | undefined, node.outType))} options={[{ value: "", label: "Any" }, ...cables.map((c) => ({ value: c, label: c }))]} />
                     <Select label="Output cable" value={node.outType ?? ""} onChange={(v) => commit(setPortTypes(d, node.id, node.inType, (v || undefined) as Cable | undefined))} options={[{ value: "", label: "Any" }, ...cables.map((c) => ({ value: c, label: c }))]} />
                   </div>
+                  <details className="rounded-md border border-zinc-800 p-2.5" open={Boolean(node.flag || node.ip || node.watts || node.rackU || node.maxFormat)}>
+                    <summary className="cursor-pointer text-xs text-zinc-400">More details: signal limit, network, power, flag</summary>
+                    <div className="mt-2 space-y-2">
+                      <Select label="Takes up to" value={node.maxFormat ?? ""} onChange={(v) => commit(patchNode(d, node.id, { maxFormat: (v || undefined) as Format | undefined }))} options={[{ value: "", label: "No limit set" }, ...formats.filter((f) => f !== "Other").map((c) => ({ value: c, label: c }))]} />
+                      <label className="block text-xs text-zinc-400">
+                        IP address
+                        <input className={`input mt-1 w-full ${node.ip && !isIpv4(node.ip) ? "!border-amber-500" : ""}`} placeholder="e.g. 10.0.0.20" value={node.ip ?? ""} aria-label="IP address" onFocus={() => pushHistory()} onChange={(e) => setD(patchNode(d, node.id, { ip: e.target.value }))} />
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className="block text-xs text-zinc-400">
+                          Power (watts)
+                          <input className="input mt-1 w-full" type="number" min={0} value={node.watts ?? ""} aria-label="Power in watts" onFocus={() => pushHistory()} onChange={(e) => setD(patchNode(d, node.id, { watts: Number(e.target.value) || undefined }))} />
+                        </label>
+                        <label className="block text-xs text-zinc-400">
+                          Rack units
+                          <input className="input mt-1 w-full" type="number" min={0} value={node.rackU ?? ""} aria-label="Rack units" onFocus={() => pushHistory()} onChange={(e) => setD(patchNode(d, node.id, { rackU: Number(e.target.value) || undefined }))} />
+                        </label>
+                      </div>
+                      <label className="block text-xs text-zinc-400">
+                        Flag a problem
+                        <textarea className="input mt-1 w-full" rows={2} placeholder="e.g. Need a longer lead here" value={node.flag ?? ""} aria-label="Problem flag" onFocus={() => pushHistory()} onChange={(e) => setD(patchNode(d, node.id, { flag: e.target.value }))} />
+                      </label>
+                    </div>
+                  </details>
                   <button
                     type="button"
                     className="btn"
@@ -935,6 +1242,18 @@ export default function SignalPage() {
             </button>
           </aside>
         </div>
+        <SignalTools d={d} showName={showName} base={base} versions={versions} onSaveVersion={saveVersion} onRestore={restoreVersion} onDeleteVersion={deleteVersion} />
+        <input
+          ref={csvInput}
+          type="file"
+          accept=".csv,text/csv"
+          hidden
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (f) void importCsv(f);
+          }}
+        />
       </main>
     </div>
   );
