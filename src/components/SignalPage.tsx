@@ -6,6 +6,7 @@ import {
   NODE_W,
   addNode,
   autoLayout,
+  freeSpot,
   cableColour,
   cables,
   connectPorts,
@@ -396,8 +397,8 @@ export default function SignalPage() {
     const v = view;
     const cx = el ? (el.width / 2 - v.x) / v.k : 200;
     const cy = el ? (el.height / 2 - v.y) / v.k : 150;
-    const spot = (cx - NODE_W / 2 + (d.nodes.length % 5) * 20) | 0;
-    commit(moveNode(r.diagram, r.id, snapV(spot, false), snapV(cy - 30 + (d.nodes.length % 5) * 20, false)));
+    const at = freeSpot(d, snapV(cx - NODE_W / 2, false), snapV(cy - 40, false), kind);
+    commit(moveNode(r.diagram, r.id, at.x, at.y));
     setSel({ type: "node", id: r.id });
   };
 
@@ -480,7 +481,7 @@ export default function SignalPage() {
           <div
             ref={wrap}
             className="relative min-w-0 overflow-hidden rounded-lg border border-zinc-800 bg-white"
-            style={{ height: "68vh", minHeight: 360, touchAction: "none", cursor: "grab" }}
+            style={{ height: "68vh", minHeight: 360, touchAction: "none", cursor: "grab", userSelect: "none" }}
             onPointerDown={onBgDown}
             onPointerMove={onMove}
             onPointerUp={onUp}

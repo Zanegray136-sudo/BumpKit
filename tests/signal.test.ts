@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  addNode, autoLayout, connect, connectPorts, diagramChecks, diagramSvg, emptyDiagram, importLed, maxLength, moveNode, nodeHeight, parseDiagram,
+  addNode, autoLayout, freeSpot, connect, connectPorts, diagramChecks, diagramSvg, emptyDiagram, importLed, maxLength, moveNode, nodeHeight, parseDiagram,
   patchCsv, removeNode, renameNode, setPorts, updateEdge, type Diagram,
 } from "../src/utils/signal";
 
@@ -143,5 +143,16 @@ describe("signal diagram", () => {
     expect(d.nodes[1].ins).toBe(2);
     expect(parseDiagram("junk").nodes.length).toBe(0);
     expect(parseDiagram(JSON.parse(JSON.stringify(d))).edges.length).toBe(2);
+  });
+});
+
+describe("placing new boxes", () => {
+  it("finds an empty spot instead of covering another box", () => {
+    const a = addNode(emptyDiagram(), "server", 100, 100);
+    const spot = freeSpot(a.diagram, 100, 100, "camera");
+    const n = a.diagram.nodes[0];
+    const overlap = spot.x < n.x + 170 && spot.x + 170 > n.x && spot.y < n.y + nodeHeight(n) && spot.y + 58 > n.y;
+    expect(overlap).toBe(false);
+    expect(freeSpot(emptyDiagram(), 40, 50)).toEqual({ x: 40, y: 50 });
   });
 });

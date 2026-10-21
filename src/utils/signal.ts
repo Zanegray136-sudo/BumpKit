@@ -136,6 +136,24 @@ export const removeNode = (d: Diagram, id: string): Diagram => ({
   edges: d.edges.filter((e) => e.from !== id && e.to !== id),
 });
 
+/** The nearest empty place at or below (x, y) for a new box, so it doesn't land on top of another. */
+export function freeSpot(d: Diagram, x: number, y: number, kind: NodeKind = "other"): { x: number; y: number } {
+  const k = kinds.find((a) => a.id === kind)!;
+  const h = nodeHeight({ ins: k.ins, outs: k.outs });
+  const clash = (px: number, py: number) => d.nodes.some((n) => px < n.x + NODE_W + 24 && px + NODE_W + 24 > n.x && py < n.y + nodeHeight(n) + 24 && py + h + 24 > n.y);
+  let px = x;
+  let py = y;
+  for (let col = 0; col < 8; col++) {
+    for (let row = 0; row < 40; row++) {
+      if (!clash(px, py)) return { x: px, y: py };
+      py += 20;
+    }
+    py = y;
+    px += NODE_W + 40;
+  }
+  return { x, y };
+}
+
 /** The screens from the LED planner, as much as the diagram needs of them. */
 export type LedScreenInfo = { name: string; processor: string; wide: number; high: number };
 
