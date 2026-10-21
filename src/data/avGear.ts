@@ -47,6 +47,23 @@ export const avGear: GearItem[] = [
   { brand: BM, model: "Videohub 40x40 12G", kind: "other", ins: [[40, "SDI"]], outs: [[40, "SDI"]], source: "https://www.blackmagicdesign.com/ca/developer/products/videohub/techspecs" },
   { brand: BM, model: "Videohub 80x80 12G", kind: "other", ins: [[80, "SDI"]], outs: [[80, "SDI"]], source: "https://www.blackmagicdesign.com/ca/developer/products/videohub/techspecs" },
   { brand: BM, model: "Smart Videohub 12x12", kind: "other", ins: [[12, "SDI"]], outs: [[12, "SDI"]], source: "https://www.blackmagicdesign.com/ca/developer/products/videohub/techspecs", note: "SD, HD and 6G only, not 12G." },
+  // Ross Video
+  { brand: "Ross", model: "Carbonite Ultra", kind: "switcher", ins: [[24, "SDI"]], outs: [[12, "SDI"]], source: "https://www.rossvideo.com/live-production/production-switchers/carbonite-ultra/specifications/", note: "HD mode. In UHD it drops to 18 inputs and 11 outputs. Last 2 outputs are multiviewers." },
+  { brand: "Ross", model: "Carbonite Black", kind: "switcher", ins: [[36, "SDI"]], outs: [[22, "SDI"]], source: "https://www.rossvideo.com/live-production/production-switchers/carbonite-black/specifications", note: "HD mode. In UHD it drops to 9 inputs and 5 outputs." },
+  { brand: "Ross", model: "Carbonite Black Plus", kind: "switcher", ins: [[36, "SDI"]], outs: [[25, "SDI"]], source: "https://www.rossvideo.com/live-production/production-switchers/carbonite-black/specifications", note: "HD mode. 3 of the outputs are multiviewer only." },
+  { brand: "Ross", model: "Carbonite Black Plus 12G", kind: "switcher", ins: [[36, "SDI"]], outs: [[25, "SDI"]], source: "https://www.rossvideo.com/live-production/production-switchers/carbonite-black/specifications", note: "HD mode. UHD runs on 9 inputs and 5 outputs of 12G." },
+  { brand: "Ross", model: "Graphite (13 input)", kind: "switcher", ins: [[12, "SDI"], [1, "HDMI"]], outs: [[6, "SDI"], [2, "HDMI"]], source: "https://www.rossvideo.com/products/production-switchers/graphite/graphite-specifications/", note: "The 5 and 9 input models have fewer. Check the exact SDI and HDMI split for your model." },
+  { brand: "Ross", model: "Ultrix FR1 (16x16)", kind: "other", ins: [[16, "SDI"]], outs: [[16, "SDI"]], source: "https://www.markertek.com/product/ross-ult-ns-fr1/ross-ultrix-ns-fr1-ultrix-new-style-1ru-frame-with-16x16-2-aux-ultrimix-and-ultriclean-included", note: "Also has 2 AUX ports and can grow to 32x32 with another card." },
+  { brand: "Ross", model: "Ultrix FR2 (16x16)", kind: "other", ins: [[16, "SDI"]], outs: [[16, "SDI"]], source: "https://rossvideo.com/infrastructure/routing-systems/ultrix/", note: "Built-in I/O only. More cards can be added." },
+  // Grass Valley
+  { brand: "Grass Valley", model: "K-Frame XP (base I/O)", kind: "switcher", ins: [[32, "SDI"]], outs: [[16, "SDI"]], source: "https://gvcmsumb.grassvalley.com/products/production-switchers/karrera-video-production-center", note: "The Standard frame grows to 192 inputs and 96 outputs. Also comes with IP I/O." },
+  { brand: "Grass Valley", model: "K-Frame V-Series", kind: "switcher", ins: [[16, "SDI"]], outs: [[8, "SDI"]], source: "https://gvcmsumb.grassvalley.com/products/production-switchers/karrera-video-production-center", note: "Also has 2 media-port inputs and 2 media-port outputs, which are not shown here." },
+  // Decimator
+  { brand: "Decimator", model: "MD-HX", kind: "converter", ins: [[1, "HDMI"], [1, "SDI"]], outs: [[1, "HDMI"], [4, "SDI"]], source: "https://www.markertek.com/product/dec-md-hx/decimator-md-hx-mini-3g-hd-sd-sdi-to-hdmi-cross-converter-with-scaling-frame-rate-conversion", note: "Cross converter with scaling. The 4 SDI outputs are 2 loop-throughs and 2 converted." },
+  { brand: "Decimator", model: "DMON-QUAD", kind: "converter", ins: [[4, "SDI"]], outs: [[1, "SDI"], [1, "HDMI"]], source: "https://videoguys.com.au/collections/decimator/products/decimator-dmon-quad-4-channel-3g-sdi-multiviewer", note: "Quad multiviewer." },
+  { brand: "Decimator", model: "DMON-16S", kind: "converter", ins: [[16, "SDI"]], outs: [[1, "SDI"], [1, "HDMI"]], source: "https://fullcompass.com/prod/502602-decimator-dec-dmon-16s-16-channel-video-multiviewer-with-hdmi-and-sdi", note: "16-way multiviewer." },
+  // Set-top and streaming boxes
+  { brand: "Apple", model: "Apple TV 4K", kind: "source", ins: [], outs: [[1, "HDMI"]], source: "https://apple.com/uk/apple-tv-4k/specs" },
 ];
 
 /** Generic starting points that are not tied to a brand. */
@@ -55,6 +72,8 @@ export const genericGear: GearItem[] = [
   { brand: "Generic", model: "Laptop (DisplayPort)", kind: "source", ins: [], outs: [[1, "DisplayPort"]], source: "" },
   { brand: "Generic", model: "Camera (SDI)", kind: "camera", ins: [], outs: [[1, "SDI"]], source: "" },
   { brand: "Generic", model: "Camera (HDMI)", kind: "camera", ins: [], outs: [[1, "HDMI"]], source: "" },
+  { brand: "Generic", model: "Set-top box (HDMI)", kind: "source", ins: [], outs: [[1, "HDMI"]], source: "" },
+  { brand: "Generic", model: "Streaming stick (HDMI)", kind: "source", ins: [], outs: [[1, "HDMI"]], source: "" },
   { brand: "Generic", model: "Display (HDMI)", kind: "projector", ins: [[1, "HDMI"]], outs: [], source: "" },
   { brand: "Generic", model: "Projector (SDI)", kind: "projector", ins: [[1, "SDI"]], outs: [], source: "" },
   { brand: "Generic", model: "Converter HDMI to SDI", kind: "converter", ins: [[1, "HDMI"]], outs: [[1, "SDI"]], source: "" },
