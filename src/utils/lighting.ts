@@ -31,9 +31,38 @@ export type LFixture = {
   y?: number;
 };
 
-export type Lighting = { fixtures: LFixture[] };
+export type Lighting = {
+  fixtures: LFixture[];
+  /** Trusses and other positions in the order they are listed. Fixtures sit on one in the order they appear in `fixtures`. */
+  positions?: string[];
+};
 
 export const emptyLighting = (): Lighting => ({ fixtures: [] });
+
+/** The positions in order: the ones listed first, then any a fixture uses that are not listed. "" (no position) comes last. */
+export function positionOrder(l: Lighting): string[] {
+  const out: string[] = [];
+  const add = (p: string) => {
+    const t = p.trim();
+    if (t && !out.includes(t)) out.push(t);
+  };
+  (l.positions ?? []).forEach(add);
+  l.fixtures.forEach((f) => add(f.position));
+  return out;
+}
+
+const rankOf = (l: Lighting) => {
+  const order = positionOrder(l);
+  return (p: string) => {
+    const i = order.indexOf(p.trim());
+    return i < 0 ? order.length : i;
+  };
+};
+
+/** Fixtures on a position, in order along it. Pass "" for the ones with no position. */
+export const onPosition = (l: Lighting, position: string): LFixture[] => l.fixtures.filter((f) => f.position.trim() === position.trim());
+
+const keepPositions = (l: Lighting): Lighting => (l.positions ? { ...l, positions: positionOrder(l) } : l);
 
 let counter = 0;
 export const newFixtureId = () => `f${Date.now().toString(36)}${(counter++).toString(36)}${Math.random().toString(36).slice(2, 5)}`;
@@ -52,6 +81,7 @@ const str = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max
 export function parseLighting(raw: unknown): Lighting {
   const list = raw && typeof raw === "object" ? (raw as { fixtures?: unknown }).fixtures : null;
   if (!Array.isArray(list)) return emptyLighting();
+  const listed = (raw as { positions?: unknown }).positions;
   const seen = new Set<string>();
   const fixtures: LFixture[] = [];
   for (const r of list.slice(0, MAX_FIXTURES)) {
@@ -85,7 +115,8 @@ export function parseLighting(raw: unknown): Lighting {
     }
     fixtures.push(f);
   }
-  return { fixtures };
+  const positions = Array.isArray(listed) ? [...new Set(listed.filter((p): p is string => typeof p === "string").map((p) => p.trim().slice(0, 60)).filter(Boolean))].slice(0, 200) : undefined;
+  return positions ? { fixtures, positions } : { fixtures };
 }
 
 /** Turns the old lighting table (rows with a quantity) into one fixture per unit. */
@@ -171,10 +202,11 @@ export function addFixtures(l: Lighting, def: Pick<FixtureDef, "brand" | "model"
       note: "",
     });
   }
-  return { fixtures: [...l.fixtures, ...added].slice(0, MAX_FIXTURES) };
+  return keepPositions({ ...l, fixtures: [...l.fixtures, ...added].slice(0, MAX_FIXTURES) });
 }
 
 export const patchFixture = (l: Lighting, id: string, patch: Partial<LFixture>): Lighting => ({
+  ...l,
   fixtures: l.fixtures.map((f) => {
     if (f.id !== id) return f;
     const next = { ...f, ...patch };
@@ -193,18 +225,18 @@ export const patchFixture = (l: Lighting, id: string, patch: Partial<LFixture>):
 
 export const removeFixtures = (l: Lighting, ids: string[]): Lighting => {
   const gone = new Set(ids);
-  return { fixtures: l.fixtures.filter((f) => !gone.has(f.id)) };
+  return { ...l, fixtures: l.fixtures.filter((f) => !gone.has(f.id)) };
 };
 
 export const unpatch = (l: Lighting, ids?: string[]): Lighting => {
   const only = ids ? new Set(ids) : null;
-  return { fixtures: l.fixtures.map((f) => (!only || only.has(f.id) ? { ...f, universe: 0, address: 0 } : f)) };
+  return { ...l, fixtures: l.fixtures.map((f) => (!only || only.has(f.id) ? { ...f, universe: 0, address: 0 } : f)) };
 };
 
 /** Gives the chosen fixtures a position (or clears it), and sets a note-free bulk edit. */
 export const setPosition = (l: Lighting, ids: string[], position: string): Lighting => {
   const set = new Set(ids);
-  return { fixtures: l.fixtures.map((f) => (set.has(f.id) ? { ...f, position: position.trim().slice(0, 60) } : f)) };
+  return keepPositions({ ...l, fixtures: l.fixtures.map((f) => (set.has(f.id) ? { ...f, position: position.trim().slice(0, 60) } : f)) });
 };
 
 /** Puts one more copy of a fixture right after it, with a fresh label and no address. */
@@ -222,9 +254,87 @@ export function duplicateFixtures(l: Lighting, ids: string[]): Lighting {
       out.push({ ...f, id: newFixtureId(), label: `${f.model} ${n}`, universe: 0, address: 0 });
     }
   }
-  return { fixtures: out.slice(0, MAX_FIXTURES) };
+  return { ...l, fixtures: out.slice(0, MAX_FIXTURES) };
 }
 
+// ---------------------------------------------------------------- trusses
+
+/** Adds an empty truss (or other position) at the end. */
+export function addPosition(l: Lighting, name: string): Lighting {
+  const t = name.trim().slice(0, 60);
+  if (!t || positionOrder(l).includes(t)) return l;
+  return { ...l, positions: [...positionOrder(l), t] };
+}
+
+/** Renames a position everywhere. If the new name is already used the two are joined. */
+export function renamePosition(l: Lighting, from: string, to: string): Lighting {
+  const t = to.trim().slice(0, 60);
+  if (!t || t === from) return l;
+  const order = positionOrder(l).map((p) => (p === from ? t : p));
+  return { ...l, positions: [...new Set(order)], fixtures: l.fixtures.map((f) => (f.position.trim() === from ? { ...f, position: t } : f)) };
+}
+
+/** Takes a position away. Its fixtures stay, with no position. */
+export function removePosition(l: Lighting, name: string): Lighting {
+  return { ...l, positions: positionOrder(l).filter((p) => p !== name), fixtures: l.fixtures.map((f) => (f.position.trim() === name ? { ...f, position: "" } : f)) };
+}
+
+/** Moves a position up (-1) or down (+1) the list. */
+export function movePosition(l: Lighting, name: string, by: number): Lighting {
+  const order = positionOrder(l);
+  const i = order.indexOf(name);
+  const j = i + by;
+  if (i < 0 || j < 0 || j >= order.length) return l;
+  order.splice(i, 1);
+  order.splice(j, 0, name);
+  return { ...l, positions: order };
+}
+
+/**
+ * Puts a fixture on a position at a place along it (0 is the first). Other fixtures keep their order.
+ * Moving to "" takes it off any truss.
+ */
+export function moveFixture(l: Lighting, id: string, position: string, index: number): Lighting {
+  const f = l.fixtures.find((x) => x.id === id);
+  if (!f) return l;
+  const target = position.trim().slice(0, 60);
+  const rest = l.fixtures.filter((x) => x.id !== id);
+  const there = rest.filter((x) => x.position.trim() === target);
+  const moved = { ...f, position: target };
+  const at = Math.max(0, Math.min(there.length, index));
+  let fixturesOut: LFixture[];
+  if (at < there.length) {
+    const before = rest.indexOf(there[at]);
+    fixturesOut = [...rest.slice(0, before), moved, ...rest.slice(before)];
+  } else if (there.length > 0) {
+    const after = rest.indexOf(there[there.length - 1]) + 1;
+    fixturesOut = [...rest.slice(0, after), moved, ...rest.slice(after)];
+  } else {
+    fixturesOut = [...rest, moved];
+  }
+  return keepPositions({ ...l, fixtures: fixturesOut });
+}
+
+/** Nudges a fixture one place along its truss. */
+export function nudgeFixture(l: Lighting, id: string, by: -1 | 1): Lighting {
+  const f = l.fixtures.find((x) => x.id === id);
+  if (!f) return l;
+  const list = onPosition(l, f.position);
+  const i = list.findIndex((x) => x.id === id);
+  const j = i + by;
+  if (j < 0 || j >= list.length) return l;
+  return moveFixture(l, id, f.position, j);
+}
+
+/** Puts a set of fixtures on a position, after what is already there, in the order they are listed. */
+export function placeFixtures(l: Lighting, ids: string[], position: string): Lighting {
+  const want = new Set(ids);
+  let out = l;
+  l.fixtures.filter((f) => want.has(f.id)).forEach((f) => {
+    out = moveFixture(out, f.id, position, onPosition(out, position).filter((x) => x.id !== f.id).length);
+  });
+  return out;
+}
 // ---------------------------------------------------------------- patching
 
 export type PatchOptions = {
@@ -252,7 +362,10 @@ export function autoPatch(l: Lighting, o: PatchOptions = {}): Lighting {
   const gap = Math.max(0, o.gap ?? 0);
   const start = Math.max(1, o.start ?? 1);
   let order = l.fixtures.map((f, i) => ({ f, i }));
-  if (o.order === "position") order = [...order].sort((a, b) => a.f.position.localeCompare(b.f.position, undefined, { numeric: true }) || a.i - b.i);
+  if (o.order === "position") {
+    const rank = rankOf(l);
+    order = [...order].sort((a, b) => rank(a.f.position) - rank(b.f.position) || a.i - b.i);
+  }
   if (o.order === "type") order = [...order].sort((a, b) => typeKey(a.f).localeCompare(typeKey(b.f)) || a.i - b.i);
   let u = start;
   let a = 1;
@@ -283,7 +396,7 @@ export function autoPatch(l: Lighting, o: PatchOptions = {}): Lighting {
     result.set(f.id, { universe: u, address: a });
     a += f.channels + gap;
   }
-  return { fixtures: l.fixtures.map((f) => (result.has(f.id) ? { ...f, ...result.get(f.id)! } : o.onlyUnpatched ? f : { ...f, universe: 0, address: 0 })) };
+  return { ...l, fixtures: l.fixtures.map((f) => (result.has(f.id) ? { ...f, ...result.get(f.id)! } : o.onlyUnpatched ? f : { ...f, universe: 0, address: 0 })) };
 }
 
 export const endAddress = (f: LFixture) => (f.universe > 0 ? f.address + f.channels - 1 : 0);
@@ -374,7 +487,10 @@ export type PositionTotals = { position: string; fixtures: number; channels: num
 export function positionTotals(l: Lighting, o: PowerOptions = {}): PositionTotals[] {
   const volts = o.volts ?? 230;
   const per = (o.breaker ?? 16) * (o.load ?? 0.8);
+  const rank = rankOf(l);
   const map = new Map<string, PositionTotals>();
+  // Trusses with nothing on them still show, so the list matches what was drawn up.
+  for (const p of l.positions ?? []) map.set(p, { position: p, fixtures: 0, channels: 0, watts: 0, amps: 0, circuits: 0, kg: 0, unknownPower: 0, unknownWeight: 0 });
   for (const f of l.fixtures) {
     const p = f.position.trim();
     const t = map.get(p) ?? { position: p, fixtures: 0, channels: 0, watts: 0, amps: 0, circuits: 0, kg: 0, unknownPower: 0, unknownWeight: 0 };
@@ -391,7 +507,7 @@ export function positionTotals(l: Lighting, o: PowerOptions = {}): PositionTotal
       const amps = Math.round((t.watts / volts) * 10) / 10;
       return { ...t, kg: Math.round(t.kg * 10) / 10, amps, circuits: per > 0 ? Math.ceil(amps / per - 1e-9) : 0 };
     })
-    .sort((a, b) => (a.position === "" ? 1 : b.position === "" ? -1 : a.position.localeCompare(b.position, undefined, { numeric: true })));
+    .sort((a, b) => rank(a.position) - rank(b.position));
 }
 
 export function totals(l: Lighting, o: PowerOptions = {}) {
@@ -423,7 +539,8 @@ export function hangList(l: Lighting): { position: string; fixture: string; mode
     r.qty++;
     map.set(k, r);
   }
-  return [...map.values()].sort((a, b) => (a.position === "" ? 1 : b.position === "" ? -1 : a.position.localeCompare(b.position, undefined, { numeric: true })) || a.fixture.localeCompare(b.fixture));
+  const rank = rankOf(l);
+  return [...map.values()].sort((a, b) => rank(a.position) - rank(b.position));
 }
 
 // ---------------------------------------------------------------- export
@@ -438,7 +555,10 @@ export type SortBy = "listed" | "address" | "position";
 export function sorted(l: Lighting, by: SortBy): LFixture[] {
   const list = [...l.fixtures];
   if (by === "address") return list.sort((a, b) => (a.universe || 1e9) - (b.universe || 1e9) || a.address - b.address);
-  if (by === "position") return list.sort((a, b) => (a.position === "" ? 1 : b.position === "" ? -1 : a.position.localeCompare(b.position, undefined, { numeric: true })));
+  if (by === "position") {
+    const rank = rankOf(l);
+    return list.sort((a, b) => rank(a.position) - rank(b.position));
+  }
   return list;
 }
 

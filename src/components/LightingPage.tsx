@@ -3,6 +3,7 @@ import { fixtureGroups, fixtureKey, fixtures as libFixtures, genericFixtures, ty
 import {
   UNIVERSE,
   addFixtures,
+  addPosition,
   autoPatch,
   duplicateFixtures,
   endAddress,
@@ -10,6 +11,14 @@ import {
   fmtAddress,
   hangCsv,
   hangList,
+  movePosition,
+  moveFixture,
+  nudgeFixture,
+  onPosition,
+  placeFixtures,
+  positionOrder,
+  removePosition,
+  renamePosition,
   importPatchCsv,
   loadLighting,
   patchChecks,
@@ -18,7 +27,6 @@ import {
   positionTotals,
   removeFixtures,
   saveLighting,
-  setPosition,
   sorted,
   totals,
   unpatch,
@@ -32,7 +40,8 @@ import { downloadLightingPdf } from "../utils/lightingPdf";
 import { loadSaved } from "../utils/projectFile";
 import { downloadCsv } from "../utils/sharedCanvas";
 
-type Tab = "patch" | "universes" | "power";
+type Tab = "patch" | "trusses" | "universes" | "power";
+type AutoMode = "off" | "new" | "all";
 const allDefs: FixtureDef[] = [...libFixtures, ...genericFixtures];
 const defOf = (f: LFixture) => allDefs.find((d) => fixtureKey(d) === `${f.brand} ${f.model}`.trim());
 
@@ -53,6 +62,22 @@ export default function LightingPage() {
   const [filter, setFilter] = useState("");
   const [msg, setMsg] = useState("");
   const [power, setPower] = useState({ volts: 230, breaker: 16, load: 80 });
+  const [auto, setAutoState] = useState<AutoMode>(() => {
+    try {
+      const v = localStorage.getItem("bumpkit.lighting.auto");
+      return v === "off" || v === "all" ? v : "new";
+    } catch {
+      return "new";
+    }
+  });
+  const setAuto = (m: AutoMode) => {
+    setAutoState(m);
+    try {
+      localStorage.setItem("bumpkit.lighting.auto", m);
+    } catch {
+      /* not saved */
+    }
+  };
   const csvInput = useRef<HTMLInputElement>(null);
 
   const saved = useMemo(() => loadSaved(), []);
@@ -95,13 +120,16 @@ export default function LightingPage() {
       hist.current.future = [];
       typing.current = key;
     }
-    setL((cur) => patchFixture(cur, id, patch));
+    setL((cur) => {
+      const next = patchFixture(cur, id, patch);
+      return auto === "all" && ("channels" in patch || "mode" in patch || "position" in patch) ? autoPatch(next, { ...pat, onlyUnpatched: false, order: "position" }) : next;
+    });
   };
 
   const opts = { volts: power.volts, breaker: power.breaker, load: power.load / 100 };
   const checks = useMemo(() => patchChecks(l), [l]);
   const tot = useMemo(() => totals(l, opts), [l, power]); // eslint-disable-line react-hooks/exhaustive-deps
-  const positions = useMemo(() => [...new Set(l.fixtures.map((f) => f.position).filter(Boolean))], [l]);
+  const positions = useMemo(() => positionOrder(l), [l]);
   const badIds = useMemo(() => new Set(checks.filter((c) => c.level === "error").flatMap((c) => c.ids)), [checks]);
   const selSet = useMemo(() => new Set(sel), [sel]);
 
@@ -117,16 +145,23 @@ export default function LightingPage() {
   };
 
   const add = (def: FixtureDef, mode: number, qty: number, position: string) => {
-    const next = addFixtures(l, def, mode, qty, position);
+    const added = addFixtures(l, def, mode, qty, position);
+    const next = settle(added, "add");
     commit(next);
-    setSel(next.fixtures.slice(l.fixtures.length).map((f) => f.id));
-    flash(`Added ${qty} × ${fixtureKey(def)}. Use Auto-patch when you are ready to give them addresses.`);
+    setSel(added.fixtures.slice(l.fixtures.length).map((f) => f.id));
+    flash(auto === "off" ? `Added ${qty} × ${fixtureKey(def)}. Use Auto-patch when you are ready to give them addresses.` : `Added ${qty} × ${fixtureKey(def)} and patched ${qty === 1 ? "it" : "them"}.`);
   };
   const addCustom = (name: string, channels: number, watts: number, kg: number, qty: number, position: string) => {
     add({ brand: "Generic", model: name || "Custom fixture", group: "Other", modes: [{ name: `${channels} channel`, channels }], watts, kg, source: "" }, 0, qty, position);
   };
 
   const [pat, setPat] = useState<Required<Pick<PatchOptions, "start" | "order" | "newUniverseFor" | "gap">> & { onlyUnpatched: boolean }>({ start: 1, order: "listed", newUniverseFor: "none", gap: 0, onlyUnpatched: false });
+  /** Patches on its own after a change, as far as the Auto-patch switch allows. */
+  const settle = (next: Lighting, kind: "add" | "structure"): Lighting => {
+    if (auto === "all") return autoPatch(next, { ...pat, onlyUnpatched: false, order: "position" });
+    if (auto === "new" && kind === "add") return autoPatch(next, { ...pat, onlyUnpatched: true });
+    return next;
+  };
   const runPatch = () => {
     const next = autoPatch(l, pat);
     commit(next);
@@ -189,6 +224,14 @@ export default function LightingPage() {
             <summary className={`btn-primary cursor-pointer list-none ${small}`}>Auto-patch ▾</summary>
             <div className="absolute left-0 z-20 mt-1 w-72 space-y-2 rounded-lg border border-zinc-700 bg-zinc-900 p-3 text-sm shadow-xl">
               <label className="flex items-center justify-between gap-2">
+                <span className="text-zinc-300">Patch by itself</span>
+                <select className="input !w-40 !py-1" value={auto} onChange={(e) => setAuto(e.target.value as AutoMode)} aria-label="Patch by itself">
+                  <option value="off">Off</option>
+                  <option value="new">New fixtures</option>
+                  <option value="all">Everything, in truss order</option>
+                </select>
+              </label>
+              <label className="flex items-center justify-between gap-2">
                 <span className="text-zinc-300">Start at universe</span>
                 <input className="input !w-20 !py-1" type="number" min={1} value={pat.start} onChange={(e) => setPat({ ...pat, start: Math.max(1, Number(e.target.value) || 1) })} />
               </label>
@@ -196,7 +239,7 @@ export default function LightingPage() {
                 <span className="text-zinc-300">Patch in order of</span>
                 <select className="input !w-36 !py-1" value={pat.order} onChange={(e) => setPat({ ...pat, order: e.target.value as PatchOptions["order"] & string })}>
                   <option value="listed">The list</option>
-                  <option value="position">Position</option>
+                  <option value="position">Truss order</option>
                   <option value="type">Fixture type</option>
                 </select>
               </label>
@@ -204,7 +247,7 @@ export default function LightingPage() {
                 <span className="text-zinc-300">New universe for each</span>
                 <select className="input !w-36 !py-1" value={pat.newUniverseFor} onChange={(e) => setPat({ ...pat, newUniverseFor: e.target.value as PatchOptions["newUniverseFor"] & string })}>
                   <option value="none">Nothing, fill up</option>
-                  <option value="position">Position</option>
+                  <option value="position">Truss</option>
                   <option value="type">Fixture type</option>
                 </select>
               </label>
@@ -230,6 +273,7 @@ export default function LightingPage() {
             {(
               [
                 ["patch", "Patch"],
+                ["trusses", "Trusses"],
                 ["universes", "Universes"],
                 ["power", "Power and weight"],
               ] as [Tab, string][]
@@ -270,10 +314,10 @@ export default function LightingPage() {
                   <BulkBar
                     count={sel.length}
                     positions={positions}
-                    onPosition={(p) => commit(setPosition(l, sel, p))}
-                    onDuplicate={() => (commit(duplicateFixtures(l, sel)), flash("Added a copy after each one. They have no address yet."))}
+                    onPosition={(p) => commit(settle(placeFixtures(l, sel, p), "structure"))}
+                    onDuplicate={() => (commit(settle(duplicateFixtures(l, sel), "add")), flash(auto === "off" ? "Added a copy after each one. They have no address yet." : "Added a copy after each one and patched them."))}
                     onUnpatch={() => commit(unpatch(l, sel))}
-                    onDelete={() => (commit(removeFixtures(l, sel)), setSel([]))}
+                    onDelete={() => (commit(settle(removeFixtures(l, sel), "structure")), setSel([]))}
                     onClear={() => setSel([])}
                   />
                 )}
@@ -290,6 +334,14 @@ export default function LightingPage() {
                   onEndTyping={() => (typing.current = "")}
                 />
               </>
+            )}
+            {tab === "trusses" && (
+              <Trusses
+                l={l}
+                auto={auto}
+                onChange={(next) => commit(settle(next, "structure"))}
+                onPick={(id) => (setSel([id]), setTab("patch"))}
+              />
             )}
             {tab === "universes" && <Universes l={l} sel={selSet} onPick={(id) => (setTab("patch"), setSel([id]))} onFill={(u) => flash(`First free run in universe ${u}: ${firstFree(l, u, 1) || "none"}.`)} />}
             {tab === "power" && <Power l={l} power={power} setPower={setPower} opts={opts} />}
@@ -820,3 +872,147 @@ function Power({ l, power, setPower, opts }: { l: Lighting; power: { volts: numb
   );
 }
 
+
+
+/** Each truss is a rail of fixtures in order. The order is the patch order. */
+function Trusses({ l, auto, onChange, onPick }: { l: Lighting; auto: AutoMode; onChange: (next: Lighting) => void; onPick: (id: string) => void }) {
+  const order = positionOrder(l);
+  const [name, setName] = useState("");
+  const drag = useRef<string | null>(null);
+  const [over, setOver] = useState("");
+  const loose = l.fixtures.filter((f) => !f.position.trim());
+  const [renaming, setRenaming] = useState<{ from: string; to: string } | null>(null);
+
+  const drop = (position: string, index: number) => {
+    const id = drag.current;
+    drag.current = null;
+    setOver("");
+    if (id) onChange(moveFixture(l, id, position, index));
+  };
+
+  const chip = (f: LFixture, i: number, position: string, n: number) => {
+    const h = hue(`${f.brand} ${f.model}`);
+    return (
+      <div
+        key={f.id}
+        draggable
+        onDragStart={(e) => {
+          drag.current = f.id;
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setData("text/plain", f.id);
+        }}
+        onDragEnd={() => (drag.current = null, setOver(""))}
+        onDragOver={(e) => (e.preventDefault(), setOver(`${position}:${i}`))}
+        onDrop={(e) => (e.preventDefault(), e.stopPropagation(), drop(position, i))}
+        className={`group relative w-24 shrink-0 cursor-grab rounded-md border bg-zinc-900 p-1.5 text-xs ${over === `${position}:${i}` ? "border-blue-400" : "border-zinc-700"}`}
+        style={{ borderTopColor: `hsl(${h} 70% 55%)`, borderTopWidth: 3 }}
+      >
+        <button type="button" className="block w-full truncate text-left font-medium text-zinc-100 hover:underline" title={`${f.label} (open in patch)`} onClick={() => onPick(f.id)}>
+          {position ? `${i + 1}. ` : ""}
+          {f.label || f.model}
+        </button>
+        <div className="truncate text-zinc-400" title={`${f.brand} ${f.model}`}>
+          {f.model}
+        </div>
+        <div className={f.universe ? "text-emerald-400" : "text-zinc-500"}>{f.universe ? fmtAddress(f.universe, f.address) : "no address"}</div>
+        <div className="mt-1 flex justify-between">
+          <button type="button" className="rounded px-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-30" disabled={i === 0 || !position} aria-label={`Move ${f.label} earlier`} onClick={() => onChange(nudgeFixture(l, f.id, -1))}>
+            ◀
+          </button>
+          <button type="button" className="rounded px-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-30" disabled={i === n - 1 || !position} aria-label={`Move ${f.label} later`} onClick={() => onChange(nudgeFixture(l, f.id, 1))}>
+            ▶
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <form
+          className="flex gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!name.trim()) return;
+            onChange(addPosition(l, name));
+            setName("");
+          }}
+        >
+          <input className="input !w-48 !py-1.5" placeholder="New truss, e.g. Truss 1" aria-label="New truss name" value={name} onChange={(e) => setName(e.target.value)} />
+          <button type="submit" className="btn !px-3 !py-1.5 text-sm" disabled={!name.trim()}>
+            Add truss
+          </button>
+        </form>
+        <p className="text-xs text-zinc-500">
+          Drag fixtures into place, or use the arrows. {auto === "all" ? "Addresses follow the order you set here." : "Use Auto-patch with Truss order to give addresses in this order."}
+        </p>
+      </div>
+
+      {order.length === 0 && <p className="rounded-md border border-dashed border-zinc-700 p-4 text-sm text-zinc-400">No trusses yet. Add one above, or give fixtures a position when you add them from the library.</p>}
+
+      {order.map((p, pi) => {
+        const list = onPosition(l, p);
+        const watts = list.reduce((a, f) => a + f.watts, 0);
+        const kg = list.reduce((a, f) => a + f.kg, 0);
+        return (
+          <div key={p} className={`rounded-lg border bg-zinc-950 p-2 ${over === `${p}:end` ? "border-blue-400" : "border-zinc-800"}`} onDragOver={(e) => (e.preventDefault(), setOver(`${p}:end`))} onDrop={(e) => (e.preventDefault(), drop(p, list.length))}>
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              {renaming?.from === p ? (
+                <form
+                  className="flex gap-1"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    onChange(renamePosition(l, p, renaming.to));
+                    setRenaming(null);
+                  }}
+                >
+                  <input autoFocus className="input !w-40 !py-1" value={renaming.to} aria-label="Truss name" onChange={(e) => setRenaming({ from: p, to: e.target.value })} />
+                  <button type="submit" className="btn !px-2 !py-1 text-xs">
+                    Save
+                  </button>
+                  <button type="button" className="btn !px-2 !py-1 text-xs" onClick={() => setRenaming(null)}>
+                    Cancel
+                  </button>
+                </form>
+              ) : (
+                <>
+                  <h3 className="font-semibold text-zinc-100">{p}</h3>
+                  <button type="button" className="text-xs text-zinc-400 hover:text-zinc-100" onClick={() => setRenaming({ from: p, to: p })}>
+                    Rename
+                  </button>
+                </>
+              )}
+              <span className="text-xs text-zinc-500">
+                {list.length} fixtures, {watts} W, {Math.round(kg * 10) / 10} kg
+              </span>
+              <span className="ml-auto flex gap-1">
+                <button type="button" className="btn !px-2 !py-0.5 text-xs" disabled={pi === 0} aria-label={`Move ${p} up`} onClick={() => onChange(movePosition(l, p, -1))}>
+                  ▲
+                </button>
+                <button type="button" className="btn !px-2 !py-0.5 text-xs" disabled={pi === order.length - 1} aria-label={`Move ${p} down`} onClick={() => onChange(movePosition(l, p, 1))}>
+                  ▼
+                </button>
+                <button type="button" className="btn !px-2 !py-0.5 text-xs" onClick={() => onChange(removePosition(l, p))} title="Delete the truss. Its fixtures stay in the show with no position.">
+                  Delete
+                </button>
+              </span>
+            </div>
+            <div className="flex min-h-[4.5rem] flex-wrap items-stretch gap-1.5 border-y-2 border-zinc-700 py-1.5">
+              {list.length === 0 && <span className="self-center px-2 text-xs text-zinc-500">Drop fixtures here</span>}
+              {list.map((f, i) => chip(f, i, p, list.length))}
+            </div>
+          </div>
+        );
+      })}
+
+      <div className={`rounded-lg border border-dashed p-2 ${over === ":end" ? "border-blue-400" : "border-zinc-700"}`} onDragOver={(e) => (e.preventDefault(), setOver(":end"))} onDrop={(e) => (e.preventDefault(), drop("", loose.length))}>
+        <h3 className="mb-1 text-sm font-medium text-zinc-300">Not on a truss ({loose.length})</h3>
+        <div className="flex flex-wrap gap-1.5">
+          {loose.length === 0 && <span className="px-1 text-xs text-zinc-500">Everything is on a truss. Drop a fixture here to take it off.</span>}
+          {loose.map((f, i) => chip(f, i, "", loose.length))}
+        </div>
+      </div>
+    </div>
+  );
+}

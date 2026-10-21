@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { fixtures, genericFixtures, fixtureKey, fixtureGroups } from "../src/data/fixtures";
-import { addFixtures, autoPatch, duplicateFixtures, emptyLighting, firstFree, fmtAddress, fromOldRows, hangList, importPatchCsv, parseLighting, patchChecks, patchCsv, patchFixture, positionTotals, removeFixtures, setPosition, totals, unpatch, usage } from "../src/utils/lighting";
+import { addPosition, movePosition, moveFixture, nudgeFixture, onPosition, placeFixtures, positionOrder, removePosition, renamePosition, addFixtures, autoPatch, duplicateFixtures, emptyLighting, firstFree, fmtAddress, fromOldRows, hangList, importPatchCsv, parseLighting, patchChecks, patchCsv, patchFixture, positionTotals, removeFixtures, setPosition, totals, unpatch, usage } from "../src/utils/lighting";
 import { cleanShow } from "../src/utils/show";
 
 const T1 = fixtures.find((f) => f.model === "Robin T1 Profile")!;
@@ -122,7 +122,7 @@ describe("power and weight", () => {
     let l = addFixtures(emptyLighting(), AURA, 0, 10, "Truss 1"); // 400 W, 6.5 kg each
     l = addFixtures(l, T1, 0, 2, "FOH"); // 440 W, 24.3 kg each
     const p = positionTotals(l, { volts: 230, breaker: 16, load: 0.8 });
-    expect(p.map((x) => x.position).join()).toBe("FOH,Truss 1");
+    expect(p.map((x) => x.position).join()).toBe("Truss 1,FOH");
     const truss = p.find((x) => x.position === "Truss 1")!;
     expect(truss.watts).toBe(4000);
     expect(truss.amps).toBe(17.4);
@@ -143,7 +143,7 @@ describe("lists and files", () => {
   it("groups the hang list and writes the patch CSV", () => {
     let l = addFixtures(emptyLighting(), AURA, 0, 3, "Truss 1");
     l = setPosition(l, [l.fixtures[0].id], "Truss 2");
-    expect(hangList(l).map((r) => `${r.position}:${r.qty}`).join()).toBe("Truss 1:2,Truss 2:1");
+    expect(hangList(l).map((r) => `${r.position}:${r.qty}`).join()).toBe("Truss 2:1,Truss 1:2");
     const csv = patchCsv(autoPatch(l));
     expect(csv.split("\n")[0]).toBe("Unit,Label,Fixture,Mode,Channels,Universe,Address,Ends,Position,Watts,Weight (kg),Notes");
     expect(csv.split("\n").length).toBe(5);
@@ -176,5 +176,59 @@ describe("lists and files", () => {
     expect(s?.lighting?.fixtures.length).toBe(2);
     const old = cleanShow({ tables: { lighting: [{ id: "a", fixture: "Spot", qty: "2", channels: "10", universe: "1", address: "1" }] } });
     expect(old?.lighting?.fixtures.length).toBe(2);
+  });
+});
+
+describe("trusses", () => {
+  const names = (l: ReturnType<typeof emptyLighting>, p: string) => onPosition(l, p).map((f) => f.label.replace("MAC Aura XB ", "")).join();
+  it("keeps trusses in the order they were made, even empty ones", () => {
+    let l = addPosition(emptyLighting(), "Truss 1");
+    l = addPosition(l, "Truss 2");
+    l = addFixtures(l, AURA, 0, 2, "FOH");
+    expect(positionOrder(l).join()).toBe("Truss 1,Truss 2,FOH");
+    expect(positionTotals(l).map((p) => p.position).join()).toBe("Truss 1,Truss 2,FOH");
+    l = movePosition(l, "FOH", -2);
+    expect(positionOrder(l).join()).toBe("FOH,Truss 1,Truss 2");
+  });
+  it("puts fixtures on a truss in order and moves them along it", () => {
+    let l = addFixtures(emptyLighting(), AURA, 0, 4, "Truss 1");
+    expect(names(l, "Truss 1")).toBe("1,2,3,4");
+    l = nudgeFixture(l, l.fixtures[0].id, 1);
+    expect(names(l, "Truss 1")).toBe("2,1,3,4");
+    l = moveFixture(l, l.fixtures.find((f) => f.label.endsWith("4"))!.id, "Truss 1", 0);
+    expect(names(l, "Truss 1")).toBe("4,2,1,3");
+    l = moveFixture(l, l.fixtures.find((f) => f.label.endsWith("2"))!.id, "Truss 2", 0);
+    expect(names(l, "Truss 1")).toBe("4,1,3");
+    expect(names(l, "Truss 2")).toBe("2");
+    expect(positionOrder(l).join()).toBe("Truss 1,Truss 2");
+    l = nudgeFixture(l, l.fixtures.find((f) => f.label.endsWith("4"))!.id, -1);
+    expect(names(l, "Truss 1")).toBe("4,1,3");
+  });
+  it("patches in truss order", () => {
+    let l = addFixtures(emptyLighting(), AURA, 0, 3, "Truss 1");
+    l = addFixtures(l, AURA, 0, 2, "Truss 2");
+    l = movePosition(l, "Truss 2", -1);
+    l = moveFixture(l, l.fixtures.find((f) => f.label.endsWith("3"))!.id, "Truss 1", 0);
+    l = autoPatch(l, { order: "position" });
+    const addr = (label: string) => l.fixtures.find((f) => f.label === label)!.address;
+    // Truss 2 first (4, 5), then Truss 1 with 3 moved to the front
+    expect(addr("MAC Aura XB 4")).toBe(1);
+    expect(addr("MAC Aura XB 5")).toBe(15);
+    expect(addr("MAC Aura XB 3")).toBe(29);
+    expect(addr("MAC Aura XB 1")).toBe(43);
+  });
+  it("renames, removes and places a group", () => {
+    let l = addFixtures(emptyLighting(), AURA, 0, 3, "Truss 1");
+    l = renamePosition(l, "Truss 1", "Front truss");
+    expect(positionOrder(l).join()).toBe("Front truss");
+    l = placeFixtures(l, [l.fixtures[0].id, l.fixtures[1].id], "Back truss");
+    expect(names(l, "Back truss")).toBe("1,2");
+    l = removePosition(l, "Back truss");
+    expect(onPosition(l, "").length).toBe(2);
+    expect(positionOrder(l).join()).toBe("Front truss");
+  });
+  it("saves the truss list", () => {
+    const l = addPosition(addFixtures(emptyLighting(), AURA, 0, 1, "A"), "B");
+    expect(parseLighting(JSON.parse(JSON.stringify(l))).positions?.join()).toBe("A,B");
   });
 });
