@@ -164,3 +164,36 @@ export async function patchNprj(file: Uint8Array, cabs: VmpCabinet[]): Promise<P
   }
   return { bytes: await writeZip(out), notes };
 }
+
+/**
+ * A plain OBJ mesh of the screen for media servers (disguise, Pixera, Notch and others read OBJ).
+ * Metres, origin at the top-left of the wall, Y up. UVs map each cabinet to its pixels on the screen's canvas.
+ * This is a generic mesh, not any server's native format.
+ */
+export function screenObj(s: ReportData): string {
+  const cv = s.canvas;
+  const mm = s.screen?.pitch ?? 0;
+  const cabs = vmpCabinets(s);
+  if (!cv || !mm || cabs.length === 0) return "";
+  const W = cv.colX[cv.wide] ?? 1;
+  const H = cv.rowY[cv.high] ?? 1;
+  const m = (px: number) => ((px * mm) / 1000).toFixed(4);
+  const lines = [`# ${s.screenName || "Screen"} from PixelPlan: ${cabs.length} cabinets, pitch ${mm} mm, ${W} x ${H} px`, `o ${(s.screenName || "Screen").replace(/\s+/g, "_")}`];
+  const vts: string[] = [];
+  const faces: string[] = [];
+  cabs.forEach((c, i) => {
+    const p = [
+      [c.x, c.y],
+      [c.x + c.w, c.y],
+      [c.x + c.w, c.y + c.h],
+      [c.x, c.y + c.h],
+    ];
+    p.forEach(([px, py]) => {
+      lines.push(`v ${m(px)} ${m(H - py)} 0.0000`);
+      vts.push(`vt ${(px / W).toFixed(6)} ${(1 - py / H).toFixed(6)}`);
+    });
+    const b = i * 4 + 1;
+    faces.push(`g ${c.label}`, `f ${b}/${b} ${b + 1}/${b + 1} ${b + 2}/${b + 2} ${b + 3}/${b + 3}`);
+  });
+  return [...lines, ...vts, "vn 0 0 1", ...faces.map((f) => (f.startsWith("f ") ? f + "" : f))].join("\n") + "\n";
+}

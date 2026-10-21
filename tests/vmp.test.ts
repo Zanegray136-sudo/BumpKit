@@ -88,3 +88,22 @@ describe("VMP layout file", () => {
     expect(j.cabinets[1].position).toEqual({ x: 128, y: 0 });
   });
 });
+
+import { screenObj } from "../src/utils/vmp";
+describe("screen mesh", () => {
+  it("writes metres with UVs per cabinet", () => {
+    const d = {
+      screenName: "Main",
+      numberingMode: "rowcol",
+      removed: new Set<string>(),
+      screen: { pitch: 2.5 },
+      canvas: { width: 256, height: 128, wide: 2, high: 1, colX: [0, 128, 256], rowY: [0, 128] },
+      dataPlan: { map: [[{ port: 1, seq: 1 }, { port: 1, seq: 2 }]] },
+    } as unknown as ReportData;
+    const o = screenObj(d);
+    expect(o.includes("v 0.3200 0.0000 0.0000")).toBe(true);
+    expect(o.includes("v 0.6400 0.3200 0.0000")).toBe(true);
+    expect(o.includes("vt 0.500000 1.000000")).toBe(true);
+    expect(o.split("\n").filter((l) => l.startsWith("f ")).length).toBe(2);
+  });
+});

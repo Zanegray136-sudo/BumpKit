@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ReportData } from "../utils/reportPdf";
-import { patchNprj, vmpCabinets, vmpLayoutJson } from "../utils/vmp";
+import { patchNprj, screenObj, vmpCabinets, vmpLayoutJson } from "../utils/vmp";
 import { Select } from "./ui";
 
 function save(data: BlobPart, name: string, type: string) {
@@ -62,6 +62,15 @@ export default function NovastarPanel({ data }: { data: ReportData }) {
           />
         </label>
       </div>
+      <h3 className="mt-3 text-xs font-medium text-zinc-300">Media server mesh</h3>
+      <div className="mt-1 flex flex-wrap gap-2">
+        <button type="button" className="btn" onClick={() => save(screenObj(s), `${base}-mesh.obj`, "text/plain")}>
+          Screen mesh OBJ
+        </button>
+      </div>
+      <p className="mt-1 text-xs text-zinc-500">
+        Metres, one quad per cabinet, UVs matching the canvas. A generic mesh for disguise, Pixera or Notch to import, not their native screen files.
+      </p>
       <p className="mt-2 text-xs text-amber-400">
         Experimental. Patching is checked against a real project but has not been opened in VMP. Try the copy on a spare machine first.
       </p>
