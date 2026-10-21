@@ -144,7 +144,7 @@ export default function ExportsPage({ data }: { data: ReportData }) {
           </label>
         </div>
         <p className="mt-2 text-xs text-amber-400">
-          Experimental. Patching is checked against a real project but has not been opened in VMP. Try the copy on a spare machine first.
+          A patched project has been opened in VMP and loads. It's still a new tool, so check the layout and ports in VMP before the show and keep your original.
         </p>
         <p className="mt-1 text-xs text-zinc-500">
           Patching puts this screen's cabinets, ports and cable order into your own project and saves a copy, leaving the original alone. It refuses if the wall needs more ports, a different cabinet size or a bigger canvas than the project has.
