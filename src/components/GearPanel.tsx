@@ -14,10 +14,12 @@ const groupOf: Record<NodeKind, string> = {
   camera: "Cameras",
   projector: "Displays",
   screen: "LED screens",
+  network: "Network",
+  control: "Control",
   other: "Routers",
 };
 
-const order = ["My gear", "Switchers", "Media servers", "Routers", "LED processors", "Converters", "Sources", "Cameras", "Displays"];
+const order = ["My gear", "Switchers", "Media servers", "Routers", "Network", "Control", "LED processors", "Converters", "Sources", "Cameras", "Displays"];
 
 function build(mine: Preset[]): Item[] {
   const out: Item[] = [];

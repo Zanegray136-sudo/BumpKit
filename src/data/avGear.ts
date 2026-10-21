@@ -69,6 +69,17 @@ export const avGear: GearItem[] = [
   { brand: "Barco", model: "S3-4K Jr Gen 2", kind: "switcher", ins: [[4, "SDI"], [1, "HDMI"], [1, "DisplayPort"]], outs: [[8, "HDMI"], [4, "HDMI"]], source: "https://www.barco.com/en/product/s3-4k-jr-gen-2", note: "Last 4 outputs are the multiviewer." },
   { brand: "AJA", model: "Ki Pro Ultra 12G", kind: "converter", ins: [[4, "SDI"], [1, "HDMI"]], outs: [[4, "SDI"], [1, "HDMI"]], source: "https://files.hdtvsupply.com/aja-ki-pro-ultra-12g-ds.pdf", note: "Recorder and player. The first SDI port is 12G and the other three are 3G." },
   { brand: "Extron", model: "DXP 88 HD 4K PLUS", kind: "other", ins: [[8, "HDMI"]], outs: [[8, "HDMI"]], source: "https://creationnetworks.net/products/extron-dxp-88-hd-4k-plus-8x8-4k-60-hdmi-with-2-audio-outputs" },
+  // Network switches
+  { brand: "Netgear", model: "M4250-9G1F-PoE+", kind: "network", ins: [[9, "Cat6"], [1, "Fibre"]], outs: [[9, "Cat6"], [1, "Fibre"]], source: "https://www.shi.com/product/45192686/NETGEAR-AV-Line-M4250-9G1F-PoE", note: "Ethernet ports work both ways, so each port is listed on both sides. Use either side. 8 ports are PoE+. The SFP is listed as 1G in one place and 10G in another." },
+  { brand: "Netgear", model: "M4250-26G4F-PoE+", kind: "network", ins: [[26, "Cat6"], [4, "Fibre"]], outs: [[26, "Cat6"], [4, "Fibre"]], source: "https://www.shi.com/product/42001450/NETGEAR-AV-Line-M4250-26G4F-PoE", note: "Ethernet ports work both ways, so each port is listed on both sides. Use either side. 24 ports are PoE+ and 4 are SFP." },
+  { brand: "Netgear", model: "M4250-40G8F-PoE+", kind: "network", ins: [[40, "Cat6"], [8, "Fibre"]], outs: [[40, "Cat6"], [8, "Fibre"]], source: "https://www.shi.com/product/42001453/NETGEAR-AV-Line-M4250-40G8F-PoE", note: "Ethernet ports work both ways, so each port is listed on both sides. Use either side. All 40 copper ports are PoE+ and the 8 SFP ports are 1G." },
+  { brand: "Luminex", model: "GigaCore 16i", kind: "network", ins: [[12, "Cat6"], [4, "Fibre"]], outs: [[12, "Cat6"], [4, "Fibre"]], source: "https://www.markertek.com/product/lmx-lu010009010g/luminex-lu0100090-10g-gigacore-16i-12-port-1-gb-rj-45-ethernet-switch-with-4x-10-gb-sfp-cages", note: "Ethernet ports work both ways, so each port is listed on both sides. Use either side. The 4 fibre ports are 10G SFP+." },
+  { brand: "Luminex", model: "GigaCore 26i", kind: "network", ins: [[24, "Cat6"], [6, "Fibre"]], outs: [[24, "Cat6"], [6, "Fibre"]], source: "https://www.ac-et.com/products/luminex-gigacore-26i", note: "Ethernet ports work both ways, so each port is listed on both sides. Ports 21 to 24 share a socket with an SFP, so you can use only one of each pair." },
+  { brand: "Luminex", model: "GigaCore 30i", kind: "network", ins: [[24, "Cat6"], [6, "Fibre"]], outs: [[24, "Cat6"], [6, "Fibre"]], source: "https://www.markertek.com/product/lmx-gc30ipoepp2p/luminex-gigacore-30i-10gb-ethernet-av-network-switch-with-24x-rj45-6x-sfp-cages-poe-500watt-psu", note: "Ethernet ports work both ways, so each port is listed on both sides. Use either side. 6 SFP+ cages at 10G or 1G." },
+  { brand: "Ubiquiti", model: "UniFi USW-Pro-Max-24-PoE", kind: "network", ins: [[24, "Cat6"], [2, "Fibre"]], outs: [[24, "Cat6"], [2, "Fibre"]], source: "https://www.pbtech.co.nz/product/SWHUBI2403261/Ubiquiti-Unifi-USW-Pro-Max-24-PoE-26-Port-10G-L3-M", note: "Ethernet ports work both ways, so each port is listed on both sides. Use either side. 16 ports are 1G and 8 are 2.5G. The 2 fibre ports are 10G SFP+." },
+  // Control surfaces
+  { brand: "Elgato", model: "Stream Deck XL", kind: "control", ins: [], outs: [[1, "USB"]], source: "https://avlgear.com/products/elgato-stream-deck-xl-and-stream-deck-network-dock", note: "Plugs into a computer over USB." },
+  { brand: "Elgato", model: "Stream Deck Network Dock", kind: "control", ins: [[1, "Cat6"]], outs: [[1, "USB"]], source: "https://avlgear.com/products/elgato-stream-deck-xl-and-stream-deck-network-dock", note: "Ethernet in (PoE or powered over USB-C). The Stream Deck plugs into its USB port." },
   // Cameras
   { brand: "Panasonic", model: "AW-UE150", kind: "camera", ins: [], outs: [[2, "SDI"], [1, "HDMI"]], source: "https://eu.connect.panasonic.com/gb/en/broadcast-proav/remote-ptz-camera-systems/aw-ue150", note: "12G-SDI and 3G-SDI outputs plus HDMI 2.0. Fibre and IP are options and are not shown." },
   { brand: "Panasonic", model: "AW-UE100", kind: "camera", ins: [], outs: [[2, "SDI"], [1, "HDMI"]], source: "https://www.afcinema.com/IMG/pdf/5/c/9/aw-ue100-datasheet.pdf", note: "12G-SDI and 3G-SDI outputs plus HDMI 2.0." },
@@ -94,6 +105,13 @@ export const avGear: GearItem[] = [
 
 /** Generic starting points that are not tied to a brand. */
 export const genericGear: GearItem[] = [
+  { brand: "Generic", model: "Router (5 port)", kind: "network", ins: [[5, "Cat6"]], outs: [[5, "Cat6"]], source: "", note: "1 WAN and 4 LAN. Ports work both ways, so each is listed on both sides." },
+  { brand: "Generic", model: "Network switch (8 port)", kind: "network", ins: [[8, "Cat6"]], outs: [[8, "Cat6"]], source: "", note: "Ports work both ways, so each is listed on both sides." },
+  { brand: "Generic", model: "Network switch (16 port)", kind: "network", ins: [[16, "Cat6"]], outs: [[16, "Cat6"]], source: "", note: "Ports work both ways, so each is listed on both sides." },
+  { brand: "Generic", model: "Network switch (24 port)", kind: "network", ins: [[24, "Cat6"]], outs: [[24, "Cat6"]], source: "", note: "Ports work both ways, so each is listed on both sides." },
+  { brand: "Generic", model: "Control surface (USB)", kind: "control", ins: [], outs: [[1, "USB"]], source: "" },
+  { brand: "Generic", model: "Control surface (Ethernet)", kind: "control", ins: [], outs: [[1, "Cat6"]], source: "" },
+  { brand: "Generic", model: "USB capture card", kind: "converter", ins: [[1, "HDMI"]], outs: [[1, "USB"]], source: "" },
   { brand: "Generic", model: "Laptop (HDMI)", kind: "source", ins: [], outs: [[1, "HDMI"]], source: "" },
   { brand: "Generic", model: "Laptop (DisplayPort)", kind: "source", ins: [], outs: [[1, "DisplayPort"]], source: "" },
   { brand: "Generic", model: "Camera (SDI)", kind: "camera", ins: [], outs: [[1, "SDI"]], source: "" },

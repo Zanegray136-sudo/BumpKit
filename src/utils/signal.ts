@@ -1,6 +1,6 @@
-export type NodeKind = "server" | "source" | "camera" | "switcher" | "converter" | "processor" | "screen" | "projector" | "other";
+export type NodeKind = "server" | "source" | "camera" | "switcher" | "converter" | "processor" | "screen" | "projector" | "network" | "control" | "other";
 
-export const cables = ["HDMI", "SDI", "DisplayPort", "DVI", "Fibre", "Cat6", "NDI", "Other"] as const;
+export const cables = ["HDMI", "SDI", "DisplayPort", "DVI", "Fibre", "Cat6", "NDI", "USB", "Other"] as const;
 export type Cable = (typeof cables)[number];
 
 export const kinds: { id: NodeKind; label: string; icon: string; ins: number; outs: number; inType?: Cable; outType?: Cable }[] = [
@@ -12,6 +12,8 @@ export const kinds: { id: NodeKind; label: string; icon: string; ins: number; ou
   { id: "processor", label: "LED processor", icon: "PRC", ins: 2, outs: 4, outType: "Cat6" },
   { id: "screen", label: "LED screen", icon: "LED", ins: 1, outs: 0, inType: "Cat6" },
   { id: "projector", label: "Projector / display", icon: "PRJ", ins: 1, outs: 0 },
+  { id: "network", label: "Network / router", icon: "NET", ins: 4, outs: 4, inType: "Cat6", outType: "Cat6" },
+  { id: "control", label: "Control surface", icon: "CTL", ins: 1, outs: 1 },
   { id: "other", label: "Other", icon: "···", ins: 1, outs: 1 },
 ];
 
@@ -26,6 +28,7 @@ export const cableColour: Record<Cable, string> = {
   Fibre: "#db2777",
   Cat6: "#16a34a",
   NDI: "#0d9488",
+  USB: "#ca8a04",
   Other: "#52525b",
 };
 
