@@ -23,7 +23,7 @@ export default function StagePlan({ l, onChange, onPick }: { l: Lighting; onChan
   const pts = useMemo(() => planPoints(l), [l]);
   const byId = useMemo(() => new Map(l.fixtures.map((f) => [f.id, f])), [l]);
   const tray = pts.some((p) => !p.placed);
-  const view = { x: -1.5, y: -1.5, w: plan.w + 3, h: plan.d + 3 + (tray ? 2.5 : 0) };
+  const view = { x: -1.5, y: -1.5, w: plan.w + 3, h: plan.d + 3 + (tray ? 3.5 : 0) };
 
   const toMetres = (e: { clientX: number; clientY: number }) => {
     const el = svg.current;
@@ -168,7 +168,7 @@ export default function StagePlan({ l, onChange, onPick }: { l: Lighting; onChan
             );
           })}
           {tray && (
-            <text x={0} y={plan.d + 1.0 + 0.0} fontSize={0.35} fill="#71717a">
+            <text x={0} y={plan.d + 1.9} fontSize={0.35} fill="#71717a">
               Not placed yet. Drag these onto the stage.
             </text>
           )}

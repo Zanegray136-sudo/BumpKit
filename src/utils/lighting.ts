@@ -767,7 +767,7 @@ export function planPoints(l: Lighting): PlanPoint[] {
   let k = 0;
   for (const f of l.fixtures.filter((x) => !x.position.trim())) {
     if (typeof f.x === "number" && typeof f.y === "number") out.push({ id: f.id, x: f.x / 100, y: f.y / 100, onTruss: "", slot: 0, placed: true });
-    else out.push({ id: f.id, x: r1(0.5 + k++ * 0.8), y: p.d + 1.2, onTruss: "", slot: 0, placed: false });
+    else out.push({ id: f.id, x: r1(0.5 + k++ * 0.8), y: p.d + 2.6, onTruss: "", slot: 0, placed: false });
   }
   return out;
 }
