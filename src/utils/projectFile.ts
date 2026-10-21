@@ -10,6 +10,7 @@ import { videoFrames } from "./videoFrames";
 import { defaultCurve } from "./curve";
 import type { LedPanel } from "../data/ledPanels";
 import { newScreenState, type ScreenState } from "./screenModel";
+import { cleanShow, collectShow, type ShowData } from "./show";
 
 export type ProjectInfo = {
   name: string;
@@ -35,6 +36,8 @@ export type ProjectFile = {
   distro: DistroSettings;
   /** How many canvases the screens are laid out on, and how big they are */
   canvasSetup: CanvasSetup;
+  /** The signal diagram, gear and lists. Missing in older files and in projects with none. */
+  show?: ShowData;
 };
 
 export const emptyProject = (): ProjectFile => ({
@@ -201,6 +204,7 @@ export function parseProject(text: string): ProjectFile | null {
         ...(isObj(raw.pickSettings) ? raw.pickSettings : {}),
         prices: isObj(raw.pickSettings) && isObj(raw.pickSettings.prices) ? (raw.pickSettings.prices as Record<string, number>) : {},
       },
+      ...(cleanShow(raw.show) ? { show: cleanShow(raw.show) } : {}),
       picked: isObj(raw.picked)
         ? Object.fromEntries(Object.entries(raw.picked).filter(([, v]) => typeof v === "boolean")) as Record<string, boolean>
         : {},
@@ -210,7 +214,8 @@ export function parseProject(text: string): ProjectFile | null {
   }
 }
 
-export const projectText = (p: ProjectFile) => JSON.stringify({ ...p, savedAt: new Date().toISOString() }, null, 1);
+/** The file as text. It carries the show held in this browser, unless the project already has its own (a shared one). */
+export const projectText = (p: ProjectFile) => JSON.stringify({ ...p, show: p.show ?? collectShow() ?? undefined, savedAt: new Date().toISOString() }, null, 1);
 
 export function loadSaved(): ProjectFile | null {
   try {

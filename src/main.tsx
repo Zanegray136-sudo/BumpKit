@@ -5,7 +5,9 @@ import Hub from './components/Hub'
 import { tableModules } from './data/modules'
 import './index.css'
 import { decodeProject } from './utils/shareLink'
-import { startSharedView } from './utils/sharedView'
+import { getSharedView, startSharedView } from './utils/sharedView'
+import { setViewShow } from './utils/viewShow'
+import { emptyShow } from './utils/show'
 
 /** The hub is the front door: an empty address, or #/hub. Any page of the LED planner goes straight to it. */
 const SignalPage = lazy(() => import('./components/SignalPage'))
@@ -57,6 +59,9 @@ async function boot() {
       if (isHub()) window.location.hash = '/project'
     }
   }
+  // While viewing a shared project, its show data is read from the link and nothing is saved here.
+  const viewing = getSharedView()
+  if (viewing) setViewShow(viewing.show ?? emptyShow())
   // Loaded after the link is handled, because the app reads the saved project when it starts.
   const { default: App } = await import('./App.tsx')
   createRoot(document.getElementById('root')!).render(

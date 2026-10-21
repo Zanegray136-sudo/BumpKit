@@ -389,6 +389,8 @@ export function diagramSvg(d: Diagram, title = ""): string {
   return parts.join("");
 }
 
+import { getViewShow } from "./viewShow";
+
 const KEY = "bumpkit.signal";
 
 /** Reads a saved diagram, including older ones that had no ports. Anything unreadable is left out. */
@@ -435,6 +437,8 @@ export function parseDiagram(v: unknown): Diagram {
 }
 
 export function loadDiagram(): Diagram {
+  const view = getViewShow<{ signal?: unknown }>();
+  if (view) return parseDiagram(view.signal);
   try {
     return parseDiagram(JSON.parse(localStorage.getItem(KEY) ?? "null"));
   } catch {
@@ -443,6 +447,7 @@ export function loadDiagram(): Diagram {
 }
 
 export function saveDiagram(d: Diagram) {
+  if (getViewShow()) return;
   try {
     localStorage.setItem(KEY, JSON.stringify(d));
   } catch {

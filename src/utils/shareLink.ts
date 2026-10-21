@@ -1,4 +1,5 @@
 import { parseProject, type ProjectFile } from "./projectFile";
+import { collectShow } from "./show";
 
 const toB64Url = (bytes: Uint8Array) => {
   let bin = "";
@@ -19,7 +20,7 @@ export const canShare = () => typeof CompressionStream !== "undefined" && typeof
 
 /** The whole project squeezed into text that fits in a web address. */
 export async function encodeProject(p: ProjectFile): Promise<string> {
-  const raw = new TextEncoder().encode(JSON.stringify(p));
+  const raw = new TextEncoder().encode(JSON.stringify({ ...p, show: p.show ?? collectShow() ?? undefined }));
   return toB64Url(await pipe(raw, new CompressionStream("gzip")));
 }
 

@@ -1,4 +1,5 @@
 import { processors } from "../data/processors";
+import { getViewShow } from "./viewShow";
 import { cables, kinds, type Cable, type NodeKind, type Preset, type SigNode } from "./signal";
 
 /** Every LED processor PixelPlan knows, as a box with one output per Ethernet port. */
@@ -11,7 +12,7 @@ export const processorPorts = (model: string): { outs: number } | null => {
   return p ? { outs: Math.max(1, p.ethernetPorts) } : null;
 };
 
-const KEY = "bumpkit.gear";
+const KEY = "bumpkit.mygear";
 
 export const presetFromNode = (n: SigNode): Preset => ({ name: n.label, kind: n.kind, ins: n.ins, outs: n.outs, inType: n.inType, outType: n.outType });
 
@@ -30,6 +31,8 @@ export function parseGear(v: unknown): Preset[] {
 }
 
 export function loadGear(): Preset[] {
+  const view = getViewShow<{ gear?: unknown }>();
+  if (view) return parseGear(view.gear);
   try {
     return parseGear(JSON.parse(localStorage.getItem(KEY) ?? "null"));
   } catch {
@@ -38,6 +41,7 @@ export function loadGear(): Preset[] {
 }
 
 export function saveGear(list: Preset[]) {
+  if (getViewShow()) return;
   try {
     localStorage.setItem(KEY, JSON.stringify(list));
   } catch {

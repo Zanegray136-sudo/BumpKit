@@ -1,4 +1,10 @@
+import { getViewShow } from "./viewShow";
+
 export type Row = Record<string, string>;
+
+/** The lists that live in a show, by id. */
+export const TABLE_IDS = ["gear", "schedule", "lighting", "audio", "pyro"] as const;
+
 
 export type Column = {
   key: string;
@@ -35,17 +41,27 @@ export function tableCsv(cols: Column[], rows: Row[]): string {
 
 const keyOf = (id: string) => `bumpkit.${id}`;
 
+/** Keeps only rows that have an id, with every value as text. */
+export function cleanRows(v: unknown): Row[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .slice(0, 5000)
+    .filter((r) => r && typeof r === "object" && typeof r.id === "string")
+    .map((r) => Object.fromEntries(Object.entries(r).slice(0, 40).map(([k, x]) => [k, String(x ?? "").slice(0, 500)])));
+}
+
 export function loadRows(id: string): Row[] {
+  const view = getViewShow<{ tables?: Record<string, unknown> }>();
+  if (view) return cleanRows(view.tables?.[id]);
   try {
-    const v = JSON.parse(localStorage.getItem(keyOf(id)) ?? "null");
-    if (Array.isArray(v)) return v.filter((r) => r && typeof r === "object" && typeof r.id === "string").map((r) => Object.fromEntries(Object.entries(r).map(([k, x]) => [k, String(x ?? "")])));
+    return cleanRows(JSON.parse(localStorage.getItem(keyOf(id)) ?? "null"));
   } catch {
-    /* start empty */
+    return [];
   }
-  return [];
 }
 
 export function saveRows(id: string, rows: Row[]) {
+  if (getViewShow()) return;
   try {
     localStorage.setItem(keyOf(id), JSON.stringify(rows));
   } catch {

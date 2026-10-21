@@ -77,6 +77,9 @@ import ProjectSummary from "./components/ProjectSummary";
 import AppStatus from "./components/AppStatus";
 import SharedBanner from "./components/SharedBanner";
 import { endSharedView, getSharedView } from "./utils/sharedView";
+import { applyShow, collectShow, emptyShow } from "./utils/show";
+import { getViewShow, setViewShow } from "./utils/viewShow";
+import type { ShowData } from "./utils/show";
 import InstallHint from "./components/InstallHint";
 import ProcessorSharing from "./components/ProcessorSharing";
 import { planSharing } from "./utils/processorSharing";
@@ -216,7 +219,9 @@ function App() {
     setScreens((list) => list.map((x) => (x.id === id ? { ...x, name } : x)));
 
   // --- saving, opening and undo -------------------------------------------
-  const snapshot = (): ProjectFile => ({
+  const snapshot = (): ProjectFile => {
+    const show = collectShow();
+    return {
     ...emptyProject(),
     project: { name: projectName, client, venue, engineer, revision, notes },
     units,
@@ -227,7 +232,9 @@ function App() {
     customPanels,
     distro,
     canvasSetup,
-  });
+    ...(show ? { show } : {}),
+    };
+  };
 
   const [saveStatus, setSaveStatus] = useState("");
   const [viewing, setViewing] = useState(sharedAtStart !== null);
@@ -306,6 +313,7 @@ function App() {
   const newProject = () => {
     if (!window.confirm("Start a new project? Save a file first if you want to keep this one.")) return;
     clearSaved();
+    applyShow(emptyShow());
     rebase.current = true;
     load(emptyProject());
   };
@@ -318,6 +326,8 @@ function App() {
           window.alert("That file isn't a PixelPlan project.");
           return;
         }
+        // A file with a show replaces this browser's; an older file without one leaves it alone.
+        if (parsed.show) applyShow(parsed.show);
         rebase.current = true;
         load(parsed);
       })
@@ -1140,6 +1150,9 @@ function App() {
             <SharedBanner
               hasOwn={loadSaved() !== null}
               onKeep={() => {
+                const shared = getViewShow<ShowData>();
+                setViewShow(null);
+                if (shared) applyShow(shared);
                 saveLocal(snapshot());
                 endSharedView();
                 setViewing(false);
