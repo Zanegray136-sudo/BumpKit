@@ -1,4 +1,5 @@
 import { useMemo, useRef } from "react";
+import { buildContentGuide } from "../utils/contentGuide";
 import { SafeLinesSvg, SafeToggle, useSafeInDownloads, useSafeLines } from "./SafeLines";
 import type { PatternInput } from "../utils/testPattern";
 import {
@@ -189,6 +190,9 @@ export default function SharedCanvas({ screens, setLayout, setup, setSetup, proj
         <div className="flex flex-wrap gap-2">
           <button type="button" className="btn" onClick={() => setLayout(screens.map((s) => ({ id: s.id, pos: null, canvas: null })))}>
             Auto arrange
+          </button>
+          <button type="button" className="btn" onClick={() => buildContentGuide({ projectName, placed: shown, sizes, setup, paper: "a4" }).save(`${base}-content-guide.pdf`)} title="A PDF for the video team: canvas sizes, screen positions and safe areas">
+            Content guide PDF
           </button>
           <button type="button" className="btn" onClick={() => downloadCsv(positionsCsv(shown), base)}>
             Positions CSV
