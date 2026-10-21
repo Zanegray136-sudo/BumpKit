@@ -129,7 +129,12 @@ export function GearPanel({ mine, sets, onAdd, onAddSet, onBlank, onRemoveMine, 
   const groups = useMemo(() => ["All", ...order.filter((g) => (g === "Sets" ? sets.length > 0 : items.some((i) => i.group === g)))], [items, sets]);
   const words = q.toLowerCase().split(/\s+/).filter(Boolean);
   const shown = items.filter((i) => (group === "All" || i.group === group) && words.every((w) => `${i.brand} ${i.preset.name}`.toLowerCase().includes(w)));
-  const sections = order.map((g) => ({ g, rows: shown.filter((i) => i.group === g) })).filter((s) => s.rows.length);
+  // Keep each brand together under one heading, in the order the brands first appear.
+  const byBrand = (rows: Item[]) => {
+    const brands = [...new Set(rows.map((r) => r.brand))];
+    return brands.flatMap((b) => rows.filter((r) => r.brand === b));
+  };
+  const sections = order.map((g) => ({ g, rows: byBrand(shown.filter((i) => i.group === g)) })).filter((s) => s.rows.length);
 
   return (
     <aside className="panel order-3 flex min-h-0 flex-col gap-3 !p-3 lg:order-none" aria-label="Gear library">
