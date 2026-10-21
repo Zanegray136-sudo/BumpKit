@@ -1,4 +1,4 @@
-import { onPosition, positionOrder, type Lighting } from "./lighting";
+import { onPosition, planPoints, positionOrder, type Lighting } from "./lighting";
 
 /** MVR (My Virtual Rig) is the file grandMA3 reads as a patch. It is a zip holding GeneralSceneDescription.xml. */
 
@@ -13,6 +13,7 @@ export function mvrXml(l: Lighting, showName = "Show"): string {
   const groups: { name: string; ids: string[] }[] = trusses.map((p) => ({ name: p, ids: onPosition(l, p).map((f) => f.id) }));
   const loose = l.fixtures.filter((f) => !f.position.trim()).map((f) => f.id);
   if (loose.length) groups.push({ name: "No truss", ids: loose });
+  const pts = new Map(planPoints(l).map((q) => [q.id, q]));
   const fx = new Map(l.fixtures.map((f, i) => [f.id, { f, n: i + 1 }]));
   const layers = groups
     .map((g, gi) => {
@@ -21,8 +22,9 @@ export function mvrXml(l: Lighting, showName = "Show"): string {
           const { f, n } = fx.get(id)!;
           const name = f.label || `${f.brand} ${f.model}`.trim();
           const abs = f.universe ? (f.universe - 1) * 512 + f.address : 0;
-          // Millimetres: trusses 3 m apart, fixtures 1 m apart along the truss, 6 m up.
-          const m = `{1,0,0}{0,1,0}{0,0,1}{${i * 1000},${gi * 3000},6000}`;
+          // Millimetres from the stage's top left corner, as drawn on the plan. Hung 6 m up for now.
+          const q = pts.get(id);
+          const m = `{1,0,0}{0,1,0}{0,0,1}{${Math.round((q?.x ?? i) * 1000)},${Math.round((q?.y ?? gi * 3) * 1000)},6000}`;
           return `          <Fixture name="${esc(name)}" uuid="${uuid()}">
             <Matrix>${m}</Matrix>
             <GDTFSpec>${esc(`${f.brand}@${f.model}`.replace(/^@/, ""))}.gdtf</GDTFSpec>

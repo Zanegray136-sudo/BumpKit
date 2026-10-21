@@ -250,3 +250,34 @@ describe("MVR export", () => {
     expect(new TextDecoder().decode(z).includes("GeneralSceneDescription.xml")).toBe(true);
   });
 });
+
+import { placeTruss, planPoints, setStage, trussPlacement, placeFixtureAt } from "../src/utils/lighting";
+describe("stage plan", () => {
+  it("spreads fixtures along a placed truss in order", () => {
+    let l = addFixtures({ fixtures: [] }, genericFixtures[0], 0, 4, "Truss 1");
+    l = placeTruss(l, "Truss 1", { x: 6, y: 2, rot: 0, len: 8 });
+    const pts = planPoints(l).filter((p) => p.onTruss === "Truss 1");
+    expect(pts.map((p) => p.x).join()).toBe("3,5,7,9");
+    expect(pts.every((p) => p.y === 2)).toBe(true);
+    expect(pts.map((p) => p.slot).join()).toBe("1,2,3,4");
+  });
+  it("rotates, renames and removes with the truss", () => {
+    let l = addFixtures({ fixtures: [] }, genericFixtures[0], 0, 2, "A");
+    l = placeTruss(l, "A", { x: 5, y: 4, rot: 90, len: 2 });
+    const ys = planPoints(l).map((p) => p.y);
+    expect(ys[0] < ys[1]).toBe(true);
+    l = renamePosition(l, "A", "B");
+    expect(trussPlacement(l, "B").rot).toBe(90);
+    l = removePosition(l, "B");
+    expect(Object.keys(l.plan?.trusses ?? {}).length).toBe(0);
+  });
+  it("places loose fixtures and keeps the plan in a saved show", () => {
+    let l = addFixtures({ fixtures: [] }, genericFixtures[0], 0, 1);
+    expect(planPoints(l)[0].placed).toBe(false);
+    l = placeFixtureAt(l, l.fixtures[0].id, 2.5, 1);
+    l = setStage(l, 20, 10);
+    const back = parseLighting(JSON.parse(JSON.stringify(l)));
+    expect(planPoints(back)[0].x).toBe(2.5);
+    expect(back.plan?.w).toBe(20);
+  });
+});

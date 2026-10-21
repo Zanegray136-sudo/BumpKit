@@ -31,7 +31,13 @@ export type LFixture = {
   y?: number;
 };
 
+/** Where a truss sits on the stage plan. Metres from the stage's top left; rot is degrees; len is metres. */
+export type Placement = { x: number; y: number; rot: number; len: number };
+export type Plan = { w: number; d: number; trusses: Record<string, Placement> };
+
 export type Lighting = {
+  /** The stage plan: its size and where each truss sits. */
+  plan?: Plan;
   fixtures: LFixture[];
   /** Trusses and other positions in the order they are listed. Fixtures sit on one in the order they appear in `fixtures`. */
   positions?: string[];
@@ -116,7 +122,24 @@ export function parseLighting(raw: unknown): Lighting {
     fixtures.push(f);
   }
   const positions = Array.isArray(listed) ? [...new Set(listed.filter((p): p is string => typeof p === "string").map((p) => p.trim().slice(0, 60)).filter(Boolean))].slice(0, 200) : undefined;
-  return positions ? { fixtures, positions } : { fixtures };
+  const out: Lighting = positions ? { fixtures, positions } : { fixtures };
+  const plan = parsePlan((raw as { plan?: unknown }).plan);
+  if (plan) out.plan = plan;
+  return out;
+}
+
+function parsePlan(raw: unknown): Plan | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const o = raw as { w?: unknown; d?: unknown; trusses?: unknown };
+  const trusses: Record<string, Placement> = {};
+  if (o.trusses && typeof o.trusses === "object") {
+    for (const [k, v] of Object.entries(o.trusses as Record<string, unknown>).slice(0, 200)) {
+      if (!v || typeof v !== "object") continue;
+      const p = v as Record<string, unknown>;
+      trusses[k.slice(0, 60)] = { x: num(p.x, -500, 500, 0), y: num(p.y, -500, 500, 0), rot: num(p.rot, -360, 360, 0), len: num(p.len, 0.5, 100, 4) };
+    }
+  }
+  return { w: num(o.w, 1, 200, 12), d: num(o.d, 1, 200, 8), trusses };
 }
 
 /** Turns the old lighting table (rows with a quantity) into one fixture per unit. */
@@ -271,12 +294,22 @@ export function renamePosition(l: Lighting, from: string, to: string): Lighting 
   const t = to.trim().slice(0, 60);
   if (!t || t === from) return l;
   const order = positionOrder(l).map((p) => (p === from ? t : p));
-  return { ...l, positions: [...new Set(order)], fixtures: l.fixtures.map((f) => (f.position.trim() === from ? { ...f, position: t } : f)) };
+  const out: Lighting = { ...l, positions: [...new Set(order)], fixtures: l.fixtures.map((f) => (f.position.trim() === from ? { ...f, position: t } : f)) };
+  if (l.plan?.trusses[from]) {
+    const { [from]: moved, ...rest } = l.plan.trusses;
+    out.plan = { ...l.plan, trusses: { ...rest, [t]: l.plan.trusses[t] ?? moved } };
+  }
+  return out;
 }
 
 /** Takes a position away. Its fixtures stay, with no position. */
 export function removePosition(l: Lighting, name: string): Lighting {
-  return { ...l, positions: positionOrder(l).filter((p) => p !== name), fixtures: l.fixtures.map((f) => (f.position.trim() === name ? { ...f, position: "" } : f)) };
+  const out: Lighting = { ...l, positions: positionOrder(l).filter((p) => p !== name), fixtures: l.fixtures.map((f) => (f.position.trim() === name ? { ...f, position: "" } : f)) };
+  if (l.plan?.trusses[name]) {
+    const { [name]: _gone, ...rest } = l.plan.trusses;
+    out.plan = { ...l.plan, trusses: rest };
+  }
+  return out;
 }
 
 /** Moves a position up (-1) or down (+1) the list. */
@@ -650,4 +683,64 @@ export function importPatchCsv(text: string): Lighting {
     };
   });
   return parseLighting({ fixtures });
+}
+
+
+// ---------------------------------------------------------------- stage plan
+
+export const planOf = (l: Lighting): Plan => l.plan ?? { w: 12, d: 8, trusses: {} };
+const r1 = (v: number) => Math.round(v * 10) / 10;
+
+export function setStage(l: Lighting, w: number, d: number): Lighting {
+  const p = planOf(l);
+  return { ...l, plan: { ...p, w: Math.max(1, Math.min(200, r1(w) || p.w)), d: Math.max(1, Math.min(200, r1(d) || p.d)) } };
+}
+
+/** Where a truss sits. Trusses with no place yet are spread down the middle of the stage, 1 m per fixture. */
+export function trussPlacement(l: Lighting, name: string): Placement {
+  const p = planOf(l);
+  if (p.trusses[name]) return p.trusses[name];
+  const order = positionOrder(l);
+  const i = Math.max(0, order.indexOf(name));
+  const n = onPosition(l, name).length;
+  return { x: r1(p.w / 2), y: r1(((i + 1) * p.d) / (order.length + 1)), rot: 0, len: Math.max(2, n) };
+}
+
+export function placeTruss(l: Lighting, name: string, patch: Partial<Placement>): Lighting {
+  const p = planOf(l);
+  const cur = trussPlacement(l, name);
+  const next: Placement = { ...cur, ...patch };
+  next.x = r1(next.x);
+  next.y = r1(next.y);
+  next.len = Math.max(0.5, Math.min(100, r1(next.len)));
+  next.rot = ((Math.round(next.rot) % 360) + 360) % 360;
+  return { ...l, plan: { ...p, trusses: { ...p.trusses, [name]: next } } };
+}
+
+/** Drops a fixture that is not on a truss at a spot on the plan (metres). */
+export function placeFixtureAt(l: Lighting, id: string, x: number, y: number): Lighting {
+  return { ...l, fixtures: l.fixtures.map((f) => (f.id === id ? { ...f, x: Math.round(x * 100), y: Math.round(y * 100) } : f)) };
+}
+
+export type PlanPoint = { id: string; x: number; y: number; onTruss: string; slot: number; placed: boolean };
+
+/** Where every fixture is on the plan, in metres. Fixtures on a truss are spread along it in order. */
+export function planPoints(l: Lighting): PlanPoint[] {
+  const out: PlanPoint[] = [];
+  for (const name of positionOrder(l)) {
+    const list = onPosition(l, name);
+    const t = trussPlacement(l, name);
+    const a = (t.rot * Math.PI) / 180;
+    list.forEach((f, i) => {
+      const off = list.length === 1 ? 0 : -t.len / 2 + ((i + 0.5) * t.len) / list.length;
+      out.push({ id: f.id, x: r1(t.x + Math.cos(a) * off), y: r1(t.y + Math.sin(a) * off), onTruss: name, slot: i + 1, placed: true });
+    });
+  }
+  const p = planOf(l);
+  let k = 0;
+  for (const f of l.fixtures.filter((x) => !x.position.trim())) {
+    if (typeof f.x === "number" && typeof f.y === "number") out.push({ id: f.id, x: f.x / 100, y: f.y / 100, onTruss: "", slot: 0, placed: true });
+    else out.push({ id: f.id, x: r1(0.5 + k++ * 0.8), y: p.d + 1.2, onTruss: "", slot: 0, placed: false });
+  }
+  return out;
 }

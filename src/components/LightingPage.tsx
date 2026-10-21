@@ -36,12 +36,13 @@ import {
   type PatchOptions,
   type SortBy,
 } from "../utils/lighting";
+import StagePlan from "./StagePlan";
 import { downloadMvr } from "../utils/mvr";
 import { downloadLightingPdf } from "../utils/lightingPdf";
 import { loadSaved } from "../utils/projectFile";
 import { downloadCsv } from "../utils/sharedCanvas";
 
-type Tab = "patch" | "trusses" | "universes" | "power";
+type Tab = "patch" | "trusses" | "plan" | "universes" | "power";
 type AutoMode = "off" | "new" | "all";
 const allDefs: FixtureDef[] = [...libFixtures, ...genericFixtures];
 const defOf = (f: LFixture) => allDefs.find((d) => fixtureKey(d) === `${f.brand} ${f.model}`.trim());
@@ -278,6 +279,7 @@ export default function LightingPage() {
               [
                 ["patch", "Patch"],
                 ["trusses", "Trusses"],
+                ["plan", "Stage plan"],
                 ["universes", "Universes"],
                 ["power", "Power and weight"],
               ] as [Tab, string][]
@@ -347,6 +349,7 @@ export default function LightingPage() {
                 onPick={(id) => (setSel([id]), setTab("patch"))}
               />
             )}
+            {tab === "plan" && <StagePlan l={l} onChange={(next) => commit(next)} onPick={(id) => (setSel([id]), setTab("patch"))} />}
             {tab === "universes" && <Universes l={l} sel={selSet} onPick={(id) => (setTab("patch"), setSel([id]))} onFill={(u) => flash(`First free run in universe ${u}: ${firstFree(l, u, 1) || "none"}.`)} />}
             {tab === "power" && <Power l={l} power={power} setPower={setPower} opts={opts} />}
           </section>
