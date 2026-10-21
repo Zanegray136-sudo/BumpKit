@@ -1,19 +1,19 @@
 export type NodeKind = "server" | "source" | "camera" | "switcher" | "converter" | "processor" | "screen" | "projector" | "other";
 
-export const kinds: { id: NodeKind; label: string; icon: string; ins: number; outs: number }[] = [
+export const cables = ["HDMI", "SDI", "DisplayPort", "DVI", "Fibre", "Cat6", "NDI", "Other"] as const;
+export type Cable = (typeof cables)[number];
+
+export const kinds: { id: NodeKind; label: string; icon: string; ins: number; outs: number; inType?: Cable; outType?: Cable }[] = [
   { id: "server", label: "Media server", icon: "SRV", ins: 0, outs: 4 },
   { id: "source", label: "Laptop / source", icon: "SRC", ins: 0, outs: 1 },
-  { id: "camera", label: "Camera", icon: "CAM", ins: 0, outs: 1 },
+  { id: "camera", label: "Camera", icon: "CAM", ins: 0, outs: 1, outType: "SDI" },
   { id: "switcher", label: "Switcher / mixer", icon: "SW", ins: 4, outs: 2 },
   { id: "converter", label: "Converter / scaler", icon: "CNV", ins: 1, outs: 1 },
-  { id: "processor", label: "LED processor", icon: "PRC", ins: 2, outs: 4 },
-  { id: "screen", label: "LED screen", icon: "LED", ins: 1, outs: 0 },
+  { id: "processor", label: "LED processor", icon: "PRC", ins: 2, outs: 4, outType: "Cat6" },
+  { id: "screen", label: "LED screen", icon: "LED", ins: 1, outs: 0, inType: "Cat6" },
   { id: "projector", label: "Projector / display", icon: "PRJ", ins: 1, outs: 0 },
   { id: "other", label: "Other", icon: "···", ins: 1, outs: 1 },
 ];
-
-export const cables = ["HDMI", "SDI", "DisplayPort", "DVI", "Fibre", "Cat6", "NDI", "Other"] as const;
-export type Cable = (typeof cables)[number];
 
 export const formats = ["1080p60", "4K30", "4K60", "Other"] as const;
 export type Format = (typeof formats)[number];
@@ -29,7 +29,18 @@ export const cableColour: Record<Cable, string> = {
   Other: "#52525b",
 };
 
-export type SigNode = { id: string; kind: NodeKind; label: string; x: number; y: number; ins: number; outs: number };
+export type SigNode = {
+  id: string;
+  kind: NodeKind;
+  label: string;
+  x: number;
+  y: number;
+  ins: number;
+  outs: number;
+  /** The cable the inputs / outputs take, when the box only takes one kind. Unset means any. */
+  inType?: Cable;
+  outType?: Cable;
+};
 export type SigEdge = {
   id: string;
   from: string;
@@ -64,9 +75,32 @@ export const portPos = (n: SigNode, side: "in" | "out", i: number) => ({ x: side
 export function addNode(d: Diagram, kind: NodeKind, x: number, y: number, label?: string): { diagram: Diagram; id: string } {
   const k = kinds.find((a) => a.id === kind)!;
   const n = d.nodes.filter((a) => a.kind === kind).length + 1;
-  const node: SigNode = { id: uid("n"), kind, label: label ?? `${k.label} ${n}`, x, y, ins: k.ins, outs: k.outs };
+  const node: SigNode = { id: uid("n"), kind, label: label ?? `${k.label} ${n}`, x, y, ins: k.ins, outs: k.outs, ...(k.inType ? { inType: k.inType } : {}), ...(k.outType ? { outType: k.outType } : {}) };
   return { diagram: { ...d, nodes: [...d.nodes, node] }, id: node.id };
 }
+
+/** A ready-made box: a name, a kind and its ports. */
+export type Preset = { name: string; kind: NodeKind; ins: number; outs: number; inType?: Cable; outType?: Cable };
+
+export function addPreset(d: Diagram, p: Preset, x: number, y: number): { diagram: Diagram; id: string } {
+  const r = addNode(d, p.kind, x, y, p.name);
+  const c = (v: number) => Math.max(0, Math.min(MAX_PORTS, Math.round(v)));
+  const node = { ...r.diagram.nodes[r.diagram.nodes.length - 1], ins: c(p.ins), outs: c(p.outs), inType: p.inType, outType: p.outType };
+  if (!node.inType) delete node.inType;
+  if (!node.outType) delete node.outType;
+  return { diagram: { ...r.diagram, nodes: [...r.diagram.nodes.slice(0, -1), node] }, id: r.id };
+}
+
+/** What a cable should be when drawn from one box to another: what the ports take, else the person's choice. */
+export const cableBetween = (from: SigNode | undefined, to: SigNode | undefined, fallback: Cable): Cable => from?.outType ?? to?.inType ?? fallback;
+
+export const setPortTypes = (d: Diagram, id: string, inType: Cable | undefined, outType: Cable | undefined): Diagram =>
+  mapNode(d, id, (n) => {
+    const { inType: _i, outType: _o, ...rest } = n;
+    void _i;
+    void _o;
+    return { ...rest, ...(inType ? { inType } : {}), ...(outType ? { outType } : {}) };
+  });
 
 const mapNode = (d: Diagram, id: string, f: (n: SigNode) => SigNode): Diagram => ({ ...d, nodes: d.nodes.map((n) => (n.id === id ? f(n) : n)) });
 
@@ -158,7 +192,7 @@ export function freeSpot(d: Diagram, x: number, y: number, kind: NodeKind = "oth
 export type LedScreenInfo = { name: string; processor: string; wide: number; high: number };
 
 /** Adds a media server, then a processor and a screen for every LED screen, joined up. New boxes go below what is there. */
-export function importLed(d: Diagram, screens: LedScreenInfo[]): Diagram {
+export function importLed(d: Diagram, screens: LedScreenInfo[], portsFor: (model: string) => { outs: number } | null = () => null): Diagram {
   if (screens.length === 0) return d;
   const top = d.nodes.length ? Math.max(...d.nodes.map((n) => n.y + nodeHeight(n))) + 60 : 40;
   const row = 130;
@@ -168,7 +202,7 @@ export function importLed(d: Diagram, screens: LedScreenInfo[]): Diagram {
   screens.forEach((s, i) => {
     const y = top + i * row;
     const p = addNode(next, "processor", 320, y, s.processor || "LED processor");
-    next = setPorts(p.diagram, p.id, 1, 2);
+    next = setPorts(p.diagram, p.id, 1, Math.max(1, portsFor(s.processor)?.outs ?? 2));
     const l = addNode(next, "screen", 600, y, `${s.name} (${s.wide}×${s.high})`);
     next = l.diagram;
     next = connectPorts(next, srv.id, i, p.id, 0, "DisplayPort", "Video", "Other").diagram;
@@ -218,6 +252,10 @@ export function diagramChecks(d: Diagram): Check[] {
     }
   }
   for (const e of d.edges) {
+    const a = d.nodes.find((n) => n.id === e.from);
+    const b = d.nodes.find((n) => n.id === e.to);
+    if (a?.outType && a.outType !== e.cable) out.push({ level: "warn", text: `${name(e.from)} output ${e.fromPort + 1} is ${a.outType}, but the cable is ${e.cable}.`, edge: e.id });
+    else if (b?.inType && b.inType !== e.cable) out.push({ level: "warn", text: `${name(e.to)} input ${e.toPort + 1} takes ${b.inType}, but the cable is ${e.cable}.`, edge: e.id });
     const lim = maxLength(e.cable, e.format);
     if (lim === 0) out.push({ level: "error", text: `${e.cable} can't carry ${e.format} (${name(e.from)} to ${name(e.to)}).`, edge: e.id });
     else if (e.length > 0 && e.length > lim) out.push({ level: "warn", text: `${e.cable} run of ${e.length} m is long for ${e.format}. About ${lim} m is the usual limit (${name(e.from)} to ${name(e.to)}).`, edge: e.id });
@@ -366,7 +404,10 @@ export function parseDiagram(v: unknown): Diagram {
     if (!k) continue;
     ids.add(n.id);
     const c = (x: unknown, d: number) => (typeof x === "number" && Number.isFinite(x) ? Math.max(0, Math.min(MAX_PORTS, Math.round(x))) : d);
-    nodes.push({ id: n.id, kind: k.id, label: typeof n.label === "string" ? n.label : "", x: n.x, y: n.y, ins: c(n.ins, k.ins), outs: c(n.outs, k.outs) });
+    const ty = (x: unknown) => ((cables as readonly string[]).includes(x as string) ? (x as Cable) : undefined);
+    const inType = ty(n.inType);
+    const outType = ty(n.outType);
+    nodes.push({ id: n.id, kind: k.id, label: typeof n.label === "string" ? n.label : "", x: n.x, y: n.y, ins: c(n.ins, k.ins), outs: c(n.outs, k.outs), ...(inType ? { inType } : {}), ...(outType ? { outType } : {}) });
   }
   let d: Diagram = { nodes, edges: [] };
   for (const raw of src.edges) {

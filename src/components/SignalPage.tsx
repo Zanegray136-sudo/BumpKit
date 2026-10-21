@@ -1,10 +1,14 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Select } from "./ui";
 import { loadSaved } from "../utils/projectFile";
+import { addGear, loadGear, presetFromNode, processorPorts, processorPresets, removeGear, saveGear } from "../utils/gearLibrary";
 import { downloadCombinedPng, downloadCombinedSvg, downloadCsv } from "../utils/sharedCanvas";
 import {
   NODE_W,
   addNode,
+  addPreset,
+  cableBetween,
+  setPortTypes,
   autoLayout,
   freeSpot,
   cableColour,
@@ -34,6 +38,7 @@ import {
   type Diagram,
   type Format,
   type NodeKind,
+  type Preset,
   type SigEdge,
   type SigNode,
 } from "../utils/signal";
@@ -132,6 +137,8 @@ export default function SignalPage() {
   const [msg, setMsg] = useState("");
   const [clearAsk, setClearAsk] = useState(false);
   const [fitTick, setFitTick] = useState(1);
+  const [gear, setGear] = useState<Preset[]>(loadGear);
+  const library = useMemo(() => [...gear.map((g) => ({ ...g, group: "My gear" })), ...processorPresets().map((g) => ({ ...g, group: "LED processor" }))], [gear]);
 
   const wrap = useRef<HTMLDivElement>(null);
   const dRef = useRef(d);
@@ -372,7 +379,7 @@ export default function SignalPage() {
         if (tn.ins >= 32) return flash(`${tn.label} has no free input.`);
         next = setPorts(next, tn.id, target.port + 1, tn.outs);
       }
-      const r = connectPorts(next, a.node, a.port, target.id, target.port, cable, "", format);
+      const r = connectPorts(next, a.node, a.port, target.id, target.port, cableBetween(cur.nodes.find((x) => x.id === a.node), next.nodes.find((x) => x.id === target!.id), cable), "", format);
       if (!r.id) return flash(r.error ?? "Couldn't join those.");
       commit(r.diagram);
       setSel({ type: "edge", id: r.id });
@@ -402,6 +409,18 @@ export default function SignalPage() {
     setSel({ type: "node", id: r.id });
   };
 
+  const addFromLibrary = (i: number) => {
+    const p = library[i];
+    if (!p) return;
+    const el = wrap.current?.getBoundingClientRect();
+    const cx = el ? (el.width / 2 - view.x) / view.k : 200;
+    const cy = el ? (el.height / 2 - view.y) / view.k : 150;
+    const spot = freeSpot(d, snapV(cx - NODE_W / 2, false), snapV(cy - 40, false), p.kind);
+    const r = addPreset(d, p, spot.x, spot.y);
+    commit(r.diagram);
+    setSel({ type: "node", id: r.id });
+  };
+
   const exportSvg = diagramSvg(d, showName);
   const small = "!px-2.5 !py-1.5 text-sm";
 
@@ -417,7 +436,7 @@ export default function SignalPage() {
             <p className="truncate text-xs text-zinc-400">{showName}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className="btn" disabled={ledScreens.length === 0} onClick={() => (commit(importLed(d, ledScreens)), setFitTick((t) => t + 1))} title="Adds a media server, then a processor and screen for each LED screen in PixelPlan">
+            <button type="button" className="btn" disabled={ledScreens.length === 0} onClick={() => (commit(importLed(d, ledScreens, processorPorts)), setFitTick((t) => t + 1))} title="Adds a media server, then a processor and screen for each LED screen in PixelPlan">
               Add my LED screens
             </button>
             <button type="button" className="btn" disabled={d.nodes.length === 0} onClick={() => downloadCombinedSvg(exportSvg, `${base}-signal`)}>
@@ -442,6 +461,14 @@ export default function SignalPage() {
                 {k.label}
               </button>
             ))}
+            <select className="input !w-auto !py-1.5 text-sm" aria-label="Add from library" value="" onChange={(e) => e.target.value !== "" && addFromLibrary(Number(e.target.value))}>
+              <option value="">From library…</option>
+              {library.map((p, i) => (
+                <option key={`${p.group}${p.name}`} value={i}>
+                  {p.group}: {p.name}
+                </option>
+              ))}
+            </select>
           </div>
         </section>
 
@@ -527,6 +554,30 @@ export default function SignalPage() {
                 <>
                   <Select label="Cable type" value={cable} onChange={(v) => setCable(v as Cable)} options={cables.map((c) => ({ value: c, label: c }))} />
                   <Select label="Signal" value={format} onChange={(v) => setFormat(v as Format)} options={formats.map((c) => ({ value: c, label: c }))} />
+                  {gear.length > 0 && (
+                    <div>
+                      <p className="mb-1 text-xs text-zinc-400">My gear</p>
+                      <ul className="space-y-1 text-xs">
+                        {gear.map((g) => (
+                          <li key={g.name} className="flex items-center justify-between gap-2">
+                            <span className="truncate text-zinc-300">{g.name}</span>
+                            <button
+                              type="button"
+                              className="text-zinc-500 hover:text-zinc-100"
+                              aria-label={`Remove ${g.name} from my gear`}
+                              onClick={() => {
+                                const next = removeGear(gear, g.name);
+                                setGear(next);
+                                saveGear(next);
+                              }}
+                            >
+                              ✕
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   <p className="text-xs text-zinc-500">New cables use this type and signal. Click a box or a cable to edit it. Delete removes the selected one. Alt while dragging turns snapping off.</p>
                 </>
               )}
@@ -547,6 +598,22 @@ export default function SignalPage() {
                       <input className="input mt-1 w-full" type="number" min={0} max={32} value={node.outs} aria-label="Outputs" onChange={(e) => commit(setPorts(d, node.id, node.ins, Number(e.target.value)))} />
                     </label>
                   </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Select label="Input cable" value={node.inType ?? ""} onChange={(v) => commit(setPortTypes(d, node.id, (v || undefined) as Cable | undefined, node.outType))} options={[{ value: "", label: "Any" }, ...cables.map((c) => ({ value: c, label: c }))]} />
+                    <Select label="Output cable" value={node.outType ?? ""} onChange={(v) => commit(setPortTypes(d, node.id, node.inType, (v || undefined) as Cable | undefined))} options={[{ value: "", label: "Any" }, ...cables.map((c) => ({ value: c, label: c }))]} />
+                  </div>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => {
+                      const next = addGear(gear, presetFromNode(node));
+                      setGear(next);
+                      saveGear(next);
+                      flash(`Saved "${node.label}" to My gear. Find it under From library.`);
+                    }}
+                  >
+                    Save to my gear
+                  </button>
                   {d.nodes.length > 1 && (
                     <Select
                       label="Send to… (uses the cable above)"
@@ -562,7 +629,7 @@ export default function SignalPage() {
                         const usedOut = new Set(next.edges.filter((x) => x.from === node.id).map((x) => x.fromPort));
                         while (usedOut.has(out)) out++;
                         if (out >= node.outs) next = setPorts(next, node.id, node.ins, out + 1);
-                        const r = connectPorts(next, node.id, out, to.id, free, cable, "", format);
+                        const r = connectPorts(next, node.id, out, to.id, free, cableBetween(node, to, cable), "", format);
                         if (r.id) {
                           commit(r.diagram);
                           setSel({ type: "edge", id: r.id });
