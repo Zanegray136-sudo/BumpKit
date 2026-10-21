@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Select } from "./ui";
 import { loadSaved } from "../utils/projectFile";
 import { addGear, loadGear, presetFromNode, processorPorts, processorPresets, removeGear, saveGear } from "../utils/gearLibrary";
+import { downloadSignalPdf } from "../utils/signalPdf";
 import { downloadCombinedPng, downloadCombinedSvg, downloadCsv } from "../utils/sharedCanvas";
 import {
   NODE_W,
@@ -576,6 +577,9 @@ export default function SignalPage() {
             </button>
             <button type="button" className="btn" disabled={d.nodes.length === 0} onClick={() => downloadCombinedPng(exportSvg, dims(exportSvg).width, dims(exportSvg).height, `${base}-signal`)}>
               PNG
+            </button>
+            <button type="button" className="btn" disabled={d.nodes.length === 0} onClick={() => void downloadSignalPdf(d, showName, base)} title="Landscape PDF with the diagram and the patch list">
+              PDF
             </button>
             <button type="button" className="btn" disabled={d.edges.length === 0} onClick={() => downloadCsv(patchCsv(d), `${base}-patch-list`)}>
               Patch list CSV

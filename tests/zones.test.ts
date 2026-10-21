@@ -73,3 +73,20 @@ describe("zones and notes", () => {
     expect(s.signal.zones.length).toBe(1);
   });
 });
+
+import { fitInside, patchRows } from "../src/utils/signalPdf";
+import { connect } from "../src/utils/signal";
+
+describe("signal PDF helpers", () => {
+  it("fits a wide diagram inside a page frame without stretching", () => {
+    const f = fitInside(2000, 1000, 270, 170);
+    expect(Math.abs(f.w / f.h - 2) < 0.001).toBe(true);
+    expect(f.w <= 270 && f.h <= 170).toBe(true);
+  });
+  it("lists cables in order with port numbers", () => {
+    const a = addNode(emptyDiagram(), "server", 0, 0);
+    const b = addNode(a.diagram, "switcher", 300, 0);
+    const c = connect(b.diagram, a.id, b.id, "HDMI").diagram;
+    expect(patchRows(c)[0].slice(0, 5)).toEqual(["1", "Media server 1", "Out 1", "Switcher / mixer 1", "In 1"]);
+  });
+});
