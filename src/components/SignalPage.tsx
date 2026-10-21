@@ -1,7 +1,8 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Select } from "./ui";
+import { GearPanel } from "./GearPanel";
 import { loadSaved } from "../utils/projectFile";
-import { addGear, loadGear, presetFromNode, processorPorts, processorPresets, removeGear, saveGear } from "../utils/gearLibrary";
+import { addGear, loadGear, presetFromNode, processorPorts, removeGear, saveGear } from "../utils/gearLibrary";
 import { downloadSignalPdf } from "../utils/signalPdf";
 import { downloadCombinedPng, downloadCombinedSvg, downloadCsv } from "../utils/sharedCanvas";
 import {
@@ -25,6 +26,7 @@ import {
   ZONE_BAR,
   addPreset,
   cableBetween,
+  portCable,
   setPortTypes,
   autoLayout,
   freeSpot,
@@ -108,7 +110,8 @@ const NodeView = memo(function NodeView({
         const free = wiring && !busy.has(i);
         return (
           <g key={`i${i}`} pointerEvents="none">
-            <circle cx={p.x} cy={p.y} r={free ? 7 : 5} fill={busy.has(i) ? "#3f3f46" : "#fff"} stroke={free ? "#2563eb" : "#3f3f46"} strokeWidth={free ? 2.5 : 1.5} />
+            <title>{`Input ${i + 1}${portCable(n, "in", i) ? ` (${portCable(n, "in", i)})` : ""}`}</title>
+            <circle cx={p.x} cy={p.y} r={free ? 7 : 5} fill={busy.has(i) ? "#3f3f46" : "#fff"} stroke={free ? "#2563eb" : portCable(n, "in", i) ? cableColour[portCable(n, "in", i)!] : "#3f3f46"} strokeWidth={free ? 2.5 : 2} />
             <text x={p.x + 10} y={p.y + 3} fontSize={8} fill="#71717a">
               {i + 1}
             </text>
@@ -120,7 +123,8 @@ const NodeView = memo(function NodeView({
         return (
           <g key={`o${i}`} onPointerDown={(e) => onPortDown(e, n.id, i)} style={{ cursor: "crosshair" }}>
             <circle cx={p.x} cy={p.y} r={HIT} fill="transparent" />
-            <circle cx={p.x} cy={p.y} r={5} fill="#3f3f46" pointerEvents="none" />
+            <title>{`Output ${i + 1}${portCable(n, "out", i) ? ` (${portCable(n, "out", i)})` : ""}`}</title>
+            <circle cx={p.x} cy={p.y} r={5} fill={portCable(n, "out", i) ? cableColour[portCable(n, "out", i)!] : "#3f3f46"} pointerEvents="none" />
             <text x={p.x - 10} y={p.y + 3} fontSize={8} textAnchor="end" fill="#71717a" pointerEvents="none">
               {i + 1}
             </text>
@@ -191,7 +195,6 @@ export default function SignalPage() {
   const [clearAsk, setClearAsk] = useState(false);
   const [fitTick, setFitTick] = useState(1);
   const [gear, setGear] = useState<Preset[]>(loadGear);
-  const library = useMemo(() => [...gear.map((g) => ({ ...g, group: "My gear" })), ...processorPresets().map((g) => ({ ...g, group: "LED processor" }))], [gear]);
 
   const wrap = useRef<HTMLDivElement>(null);
   const dRef = useRef(d);
@@ -493,7 +496,7 @@ export default function SignalPage() {
         if (tn.ins >= 32) return flash(`${tn.label} has no free input.`);
         next = setPorts(next, tn.id, target.port + 1, tn.outs);
       }
-      const r = connectPorts(next, a.node, a.port, target.id, target.port, cableBetween(cur.nodes.find((x) => x.id === a.node), next.nodes.find((x) => x.id === target!.id), cable), "", format);
+      const r = connectPorts(next, a.node, a.port, target.id, target.port, cableBetween(cur.nodes.find((x) => x.id === a.node), next.nodes.find((x) => x.id === target!.id), cable, a.port, target.port), "", format);
       if (!r.id) return flash(r.error ?? "Couldn't join those.");
       commit(r.diagram);
       setSel({ type: "edge", id: r.id });
@@ -542,9 +545,7 @@ export default function SignalPage() {
     setSel({ type: "note", id: r.id });
   };
 
-  const addFromLibrary = (i: number) => {
-    const p = library[i];
-    if (!p) return;
+  const addFromLibrary = (p: Preset) => {
     const el = wrap.current?.getBoundingClientRect();
     const cx = el ? (el.width / 2 - view.x) / view.k : 200;
     const cy = el ? (el.height / 2 - view.y) / view.k : 150;
@@ -554,6 +555,10 @@ export default function SignalPage() {
     setSel({ type: "node", id: r.id });
   };
 
+  const closeMenu = (e: React.MouseEvent) => {
+    const det = (e.currentTarget as HTMLElement).closest("details");
+    if (det) det.open = false;
+  };
   const exportSvg = diagramSvg(d, showName);
   const small = "!px-2.5 !py-1.5 text-sm";
 
@@ -568,52 +573,32 @@ export default function SignalPage() {
             <h1 className="truncate text-xl font-semibold text-zinc-50">Signal diagram</h1>
             <p className="truncate text-xs text-zinc-400">{showName}</p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button type="button" className="btn" disabled={ledScreens.length === 0} onClick={() => (commit(importLed(d, ledScreens, processorPorts)), setFitTick((t) => t + 1))} title="Adds a media server, then a processor and screen for each LED screen in PixelPlan">
               Add my LED screens
             </button>
-            <button type="button" className="btn" disabled={d.nodes.length === 0} onClick={() => downloadCombinedSvg(exportSvg, `${base}-signal`)}>
-              SVG
-            </button>
-            <button type="button" className="btn" disabled={d.nodes.length === 0} onClick={() => downloadCombinedPng(exportSvg, dims(exportSvg).width, dims(exportSvg).height, `${base}-signal`)}>
-              PNG
-            </button>
-            <button type="button" className="btn" disabled={d.nodes.length === 0} onClick={() => void downloadSignalPdf(d, showName, base)} title="Landscape PDF with the diagram and the patch list">
-              PDF
-            </button>
-            <button type="button" className="btn" disabled={d.edges.length === 0} onClick={() => downloadCsv(patchCsv(d), `${base}-patch-list`)}>
-              Patch list CSV
-            </button>
+            <details className="relative">
+              <summary className="btn cursor-pointer list-none">Export ▾</summary>
+              <div className="absolute right-0 z-20 mt-1 w-56 space-y-1 rounded-lg border border-zinc-700 bg-zinc-900 p-1.5 shadow-xl">
+                <button type="button" className="menu-item" disabled={d.nodes.length === 0} onClick={(e) => (void downloadSignalPdf(d, showName, base), closeMenu(e))}>
+                  PDF (diagram and patch list)
+                </button>
+                <button type="button" className="menu-item" disabled={d.nodes.length === 0} onClick={(e) => (downloadCombinedPng(exportSvg, dims(exportSvg).width, dims(exportSvg).height, `${base}-signal`), closeMenu(e))}>
+                  PNG image
+                </button>
+                <button type="button" className="menu-item" disabled={d.nodes.length === 0} onClick={(e) => (downloadCombinedSvg(exportSvg, `${base}-signal`), closeMenu(e))}>
+                  SVG drawing
+                </button>
+                <button type="button" className="menu-item" disabled={d.edges.length === 0} onClick={(e) => (downloadCsv(patchCsv(d), `${base}-patch-list`), closeMenu(e))}>
+                  Patch list (CSV)
+                </button>
+              </div>
+            </details>
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl space-y-3 px-4 py-4 sm:px-6">
-        <section className="panel !py-3" aria-label="Add gear">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="mr-1 text-xs font-medium uppercase tracking-wide text-zinc-400">Add</span>
-            {kinds.map((k) => (
-              <button key={k.id} type="button" className={`btn ${small}`} onClick={() => addAt(k.id)}>
-                {k.label}
-              </button>
-            ))}
-            <button type="button" className={`btn ${small}`} onClick={addZoneHere}>
-              Zone
-            </button>
-            <button type="button" className={`btn ${small}`} onClick={addNoteHere}>
-              Note
-            </button>
-            <select className="input !w-auto !py-1.5 text-sm" aria-label="Add from library" value="" onChange={(e) => e.target.value !== "" && addFromLibrary(Number(e.target.value))}>
-              <option value="">From library…</option>
-              {library.map((p, i) => (
-                <option key={`${p.group}${p.name}`} value={i}>
-                  {p.group}: {p.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </section>
-
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" className={`btn ${small}`} disabled={hist.current.past.length === 0} onClick={undo} aria-label="Undo">
             ↶ Undo
@@ -634,10 +619,16 @@ export default function SignalPage() {
           <button type="button" className={`btn ${small}`} onClick={() => zoomAt(1.25)} aria-label="Zoom in">
             +
           </button>
+          <span className="mx-1 h-5 w-px bg-zinc-700" aria-hidden />
+          <button type="button" className={`btn ${small}`} onClick={addZoneHere} title="A coloured area to group gear, like Stage or FOH">
+            + Zone
+          </button>
+          <button type="button" className={`btn ${small}`} onClick={addNoteHere} title="A sticky note on the diagram">
+            + Note
+          </button>
           <label className="ml-2 flex items-center gap-1.5 text-xs text-zinc-400">
             <input type="checkbox" checked={snap} onChange={(e) => setSnap(e.target.checked)} /> Snap to grid
           </label>
-          <span className="ml-auto text-xs text-zinc-500">Drag from a filled dot to a hollow dot to join. Scroll to pan, Ctrl/⌘ + scroll to zoom.</span>
         </div>
 
         {msg && (
@@ -646,7 +637,17 @@ export default function SignalPage() {
           </p>
         )}
 
-        <div className="grid gap-4 lg:grid-cols-[1fr_290px]">
+        <div className="grid gap-4 lg:grid-cols-[250px_1fr_290px]">
+          <GearPanel
+            mine={gear}
+            onAdd={addFromLibrary}
+            onBlank={addAt}
+            onRemoveMine={(name) => {
+              const next = removeGear(gear, name);
+              setGear(next);
+              saveGear(next);
+            }}
+          />
           <div
             ref={wrap}
             className="relative min-w-0 overflow-hidden rounded-lg border border-zinc-800 bg-white"
@@ -657,9 +658,20 @@ export default function SignalPage() {
             onPointerCancel={onUp}
           >
             {d.nodes.length === 0 && d.zones.length === 0 && d.notes.length === 0 && (
-              <p className="absolute inset-0 grid place-items-center p-6 text-center text-sm text-zinc-500">
-                Nothing here yet. Add gear above, or bring in your LED screens from PixelPlan.
-              </p>
+              <div className="absolute inset-0 grid place-items-center p-6 text-center">
+                <ol className="max-w-xs space-y-2 text-left text-sm text-zinc-500">
+                  <li>
+                    <b className="text-zinc-700">1.</b> Pick gear from the list on the left, or search for a model.
+                  </li>
+                  <li>
+                    <b className="text-zinc-700">2.</b> Drag from a filled dot on one box to a hollow dot on another to run a cable.
+                  </li>
+                  <li>
+                    <b className="text-zinc-700">3.</b> Click a box or cable to rename it, set its cable type or length.
+                  </li>
+                  <li className="text-xs">Already planned LED screens? Use “Add my LED screens” at the top.</li>
+                </ol>
+              </div>
             )}
             <svg width="100%" height="100%" style={{ display: "block" }}>
               <defs>
@@ -740,31 +752,7 @@ export default function SignalPage() {
                 <>
                   <Select label="Cable type" value={cable} onChange={(v) => setCable(v as Cable)} options={cables.map((c) => ({ value: c, label: c }))} />
                   <Select label="Signal" value={format} onChange={(v) => setFormat(v as Format)} options={formats.map((c) => ({ value: c, label: c }))} />
-                  {gear.length > 0 && (
-                    <div>
-                      <p className="mb-1 text-xs text-zinc-400">My gear</p>
-                      <ul className="space-y-1 text-xs">
-                        {gear.map((g) => (
-                          <li key={g.name} className="flex items-center justify-between gap-2">
-                            <span className="truncate text-zinc-300">{g.name}</span>
-                            <button
-                              type="button"
-                              className="text-zinc-500 hover:text-zinc-100"
-                              aria-label={`Remove ${g.name} from my gear`}
-                              onClick={() => {
-                                const next = removeGear(gear, g.name);
-                                setGear(next);
-                                saveGear(next);
-                              }}
-                            >
-                              ✕
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  <p className="text-xs text-zinc-500">New cables use this type and signal. Click a box or a cable to edit it. Delete removes the selected one. Alt while dragging turns snapping off.</p>
+                  <p className="text-xs text-zinc-500">New cables use this type and signal unless the ports say otherwise. Click a box or cable to edit it. Delete removes the selected one. Scroll to pan, Ctrl/⌘ + scroll to zoom, Alt while dragging turns snapping off.</p>
                 </>
               )}
               {node && (
@@ -815,7 +803,7 @@ export default function SignalPage() {
                         const usedOut = new Set(next.edges.filter((x) => x.from === node.id).map((x) => x.fromPort));
                         while (usedOut.has(out)) out++;
                         if (out >= node.outs) next = setPorts(next, node.id, node.ins, out + 1);
-                        const r = connectPorts(next, node.id, out, to.id, free, cableBetween(node, to, cable), "", format);
+                        const r = connectPorts(next, node.id, out, to.id, free, cableBetween(node, to, cable, out, free), "", format);
                         if (r.id) {
                           commit(r.diagram);
                           setSel({ type: "edge", id: r.id });

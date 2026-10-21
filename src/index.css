@@ -136,6 +136,26 @@
     opacity: 0.5;
     cursor: not-allowed;
   }
+  .menu-item {
+    display: block;
+    width: 100%;
+    padding: 7px 10px;
+    border-radius: 5px;
+    text-align: left;
+    font-size: 14px;
+    color: var(--color-zinc-100);
+    cursor: pointer;
+  }
+  .menu-item:hover:not(:disabled) {
+    background: var(--color-zinc-800);
+  }
+  .menu-item:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  summary.btn::-webkit-details-marker {
+    display: none;
+  }
   .btn-primary {
     background: var(--color-blue-600);
     border-color: var(--color-blue-500);

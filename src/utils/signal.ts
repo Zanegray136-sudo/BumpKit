@@ -40,6 +40,9 @@ export type SigNode = {
   /** The cable the inputs / outputs take, when the box only takes one kind. Unset means any. */
   inType?: Cable;
   outType?: Cable;
+  /** The cable each port takes, for boxes that mix connectors (8 HDMI and 8 SDI in, say). Ports past the end use inType / outType. */
+  inTypes?: Cable[];
+  outTypes?: Cable[];
 };
 export type SigEdge = {
   id: string;
@@ -66,7 +69,7 @@ export type Diagram = { nodes: SigNode[]; edges: SigEdge[]; zones: Zone[]; notes
 export const NODE_W = 170;
 export const NODE_H = 58;
 export const PORT_GAP = 20;
-export const MAX_PORTS = 32;
+export const MAX_PORTS = 80;
 
 export const emptyDiagram = (): Diagram => ({ nodes: [], edges: [], zones: [], notes: [] });
 
@@ -88,19 +91,25 @@ export function addNode(d: Diagram, kind: NodeKind, x: number, y: number, label?
 }
 
 /** A ready-made box: a name, a kind and its ports. */
-export type Preset = { name: string; kind: NodeKind; ins: number; outs: number; inType?: Cable; outType?: Cable };
+export type Preset = { name: string; kind: NodeKind; ins: number; outs: number; inType?: Cable; outType?: Cable; inTypes?: Cable[]; outTypes?: Cable[] };
+
+/** The cable a port takes, if the box says. */
+export const portCable = (n: SigNode | undefined, side: "in" | "out", i: number): Cable | undefined =>
+  side === "in" ? n?.inTypes?.[i] ?? n?.inType : n?.outTypes?.[i] ?? n?.outType;
 
 export function addPreset(d: Diagram, p: Preset, x: number, y: number): { diagram: Diagram; id: string } {
   const r = addNode(d, p.kind, x, y, p.name);
   const c = (v: number) => Math.max(0, Math.min(MAX_PORTS, Math.round(v)));
-  const node = { ...r.diagram.nodes[r.diagram.nodes.length - 1], ins: c(p.ins), outs: c(p.outs), inType: p.inType, outType: p.outType };
+  const node = { ...r.diagram.nodes[r.diagram.nodes.length - 1], ins: c(p.ins), outs: c(p.outs), inType: p.inType, outType: p.outType, inTypes: p.inTypes?.slice(0, c(p.ins)), outTypes: p.outTypes?.slice(0, c(p.outs)) };
   if (!node.inType) delete node.inType;
   if (!node.outType) delete node.outType;
+  if (!node.inTypes?.length) delete node.inTypes;
+  if (!node.outTypes?.length) delete node.outTypes;
   return { diagram: { ...r.diagram, nodes: [...r.diagram.nodes.slice(0, -1), node] }, id: r.id };
 }
 
 /** What a cable should be when drawn from one box to another: what the ports take, else the person's choice. */
-export const cableBetween = (from: SigNode | undefined, to: SigNode | undefined, fallback: Cable): Cable => from?.outType ?? to?.inType ?? fallback;
+export const cableBetween = (from: SigNode | undefined, to: SigNode | undefined, fallback: Cable, fromPort = 0, toPort = 0): Cable => portCable(from, "out", fromPort) ?? portCable(to, "in", toPort) ?? fallback;
 
 export const setPortTypes = (d: Diagram, id: string, inType: Cable | undefined, outType: Cable | undefined): Diagram =>
   mapNode(d, id, (n) => {
@@ -121,7 +130,12 @@ export function setPorts(d: Diagram, id: string, ins: number, outs: number): Dia
   const usedIn = Math.max(0, ...d.edges.filter((e) => e.to === id).map((e) => e.toPort + 1));
   const usedOut = Math.max(0, ...d.edges.filter((e) => e.from === id).map((e) => e.fromPort + 1));
   const c = (v: number, min: number) => Math.max(min, Math.min(MAX_PORTS, Math.round(Number.isFinite(v) ? v : 0)));
-  return mapNode(d, id, (n) => ({ ...n, ins: c(ins, usedIn), outs: c(outs, usedOut) }));
+  return mapNode(d, id, (n) => {
+    const next = { ...n, ins: c(ins, usedIn), outs: c(outs, usedOut) };
+    if (n.inTypes) next.inTypes = n.inTypes.slice(0, next.ins);
+    if (n.outTypes) next.outTypes = n.outTypes.slice(0, next.outs);
+    return next;
+  });
 }
 
 const inputBusy = (d: Diagram, node: string, port: number) => d.edges.some((e) => e.to === node && e.toPort === port);
@@ -336,8 +350,10 @@ export function diagramChecks(d: Diagram): Check[] {
   for (const e of d.edges) {
     const a = d.nodes.find((n) => n.id === e.from);
     const b = d.nodes.find((n) => n.id === e.to);
-    if (a?.outType && a.outType !== e.cable) out.push({ level: "warn", text: `${name(e.from)} output ${e.fromPort + 1} is ${a.outType}, but the cable is ${e.cable}.`, edge: e.id });
-    else if (b?.inType && b.inType !== e.cable) out.push({ level: "warn", text: `${name(e.to)} input ${e.toPort + 1} takes ${b.inType}, but the cable is ${e.cable}.`, edge: e.id });
+    const ot = portCable(a, "out", e.fromPort);
+    const it = portCable(b, "in", e.toPort);
+    if (ot && ot !== e.cable) out.push({ level: "warn", text: `${name(e.from)} output ${e.fromPort + 1} is ${ot}, but the cable is ${e.cable}.`, edge: e.id });
+    else if (it && it !== e.cable) out.push({ level: "warn", text: `${name(e.to)} input ${e.toPort + 1} takes ${it}, but the cable is ${e.cable}.`, edge: e.id });
     const lim = maxLength(e.cable, e.format);
     if (lim === 0) out.push({ level: "error", text: `${e.cable} can't carry ${e.format} (${name(e.from)} to ${name(e.to)}).`, edge: e.id });
     else if (e.length > 0 && e.length > lim) out.push({ level: "warn", text: `${e.cable} run of ${e.length} m is long for ${e.format}. About ${lim} m is the usual limit (${name(e.from)} to ${name(e.to)}).`, edge: e.id });
@@ -503,7 +519,13 @@ export function parseDiagram(v: unknown): Diagram {
     const ty = (x: unknown) => ((cables as readonly string[]).includes(x as string) ? (x as Cable) : undefined);
     const inType = ty(n.inType);
     const outType = ty(n.outType);
-    nodes.push({ id: n.id, kind: k.id, label: typeof n.label === "string" ? n.label : "", x: n.x, y: n.y, ins: c(n.ins, k.ins), outs: c(n.outs, k.outs), ...(inType ? { inType } : {}), ...(outType ? { outType } : {}) });
+    const ins = c(n.ins, k.ins);
+    const outs = c(n.outs, k.outs);
+    const list = (x: unknown, max: number) => (Array.isArray(x) ? x.slice(0, max).map(ty) : []);
+    const full = (a: (Cable | undefined)[]) => (a.length > 0 && a.every(Boolean) ? (a as Cable[]) : undefined);
+    const inTypes = full(list(n.inTypes, ins));
+    const outTypes = full(list(n.outTypes, outs));
+    nodes.push({ id: n.id, kind: k.id, label: typeof n.label === "string" ? n.label : "", x: n.x, y: n.y, ins, outs, ...(inType ? { inType } : {}), ...(outType ? { outType } : {}), ...(inTypes ? { inTypes } : {}), ...(outTypes ? { outTypes } : {}) });
   }
   const zones: Zone[] = [];
   for (const raw of Array.isArray((src as { zones?: unknown }).zones) ? ((src as { zones: unknown[] }).zones) : []) {

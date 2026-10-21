@@ -46,7 +46,7 @@ describe("signal diagram", () => {
     const c = connectPorts(d, a, 3, b, 3, "SDI").diagram;
     const s = setPorts(c, a, 0, 1);
     expect(s.nodes.find((n) => n.id === a)!.outs).toBe(4);
-    expect(setPorts(c, a, 0, 99).nodes.find((n) => n.id === a)!.outs).toBe(32);
+    expect(setPorts(c, a, 0, 99).nodes.find((n) => n.id === a)!.outs).toBe(80);
     expect(nodeHeight({ ins: 8, outs: 2 })).toBe(198);
   });
   it("removes a box with its cables", () => {

@@ -14,7 +14,7 @@ export const processorPorts = (model: string): { outs: number } | null => {
 
 const KEY = "bumpkit.mygear";
 
-export const presetFromNode = (n: SigNode): Preset => ({ name: n.label, kind: n.kind, ins: n.ins, outs: n.outs, inType: n.inType, outType: n.outType });
+export const presetFromNode = (n: SigNode): Preset => ({ name: n.label, kind: n.kind, ins: n.ins, outs: n.outs, inType: n.inType, outType: n.outType, ...(n.inTypes ? { inTypes: n.inTypes } : {}), ...(n.outTypes ? { outTypes: n.outTypes } : {}) });
 
 /** Reads the saved list of the person's own gear. Anything unreadable is left out. */
 export function parseGear(v: unknown): Preset[] {
@@ -23,9 +23,12 @@ export function parseGear(v: unknown): Preset[] {
   for (const raw of v) {
     const p = raw as Partial<Preset>;
     if (!p || typeof p.name !== "string" || !p.name.trim() || !kinds.some((k) => k.id === p.kind)) continue;
-    const c = (x: unknown) => (typeof x === "number" && Number.isFinite(x) ? Math.max(0, Math.min(32, Math.round(x))) : 0);
+    const c = (x: unknown) => (typeof x === "number" && Number.isFinite(x) ? Math.max(0, Math.min(80, Math.round(x))) : 0);
     const ty = (x: unknown) => ((cables as readonly string[]).includes(x as string) ? (x as Cable) : undefined);
-    out.push({ name: p.name.trim().slice(0, 60), kind: p.kind as NodeKind, ins: c(p.ins), outs: c(p.outs), inType: ty(p.inType), outType: ty(p.outType) });
+    const list = (x: unknown) => (Array.isArray(x) && x.length > 0 && x.every((v) => ty(v)) ? (x as Cable[]).slice(0, 80) : undefined);
+    const inTypes = list(p.inTypes);
+    const outTypes = list(p.outTypes);
+    out.push({ name: p.name.trim().slice(0, 60), kind: p.kind as NodeKind, ins: c(p.ins), outs: c(p.outs), inType: ty(p.inType), outType: ty(p.outType), ...(inTypes ? { inTypes } : {}), ...(outTypes ? { outTypes } : {}) });
   }
   return out;
 }
