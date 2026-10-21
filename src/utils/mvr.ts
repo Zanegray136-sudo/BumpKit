@@ -8,6 +8,7 @@ const uuid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? cr
 
 /** The scene description. One layer per truss, fixtures in truss order, a fixture ID per fixture. */
 export function mvrXml(l: Lighting, showName = "Show"): string {
+  void showName;
   const trusses = positionOrder(l);
   const groups: { name: string; ids: string[] }[] = trusses.map((p) => ({ name: p, ids: onPosition(l, p).map((f) => f.id) }));
   const loose = l.fixtures.filter((f) => !f.position.trim()).map((f) => f.id);
