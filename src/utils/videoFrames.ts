@@ -210,3 +210,43 @@ export const onSafeLines = (f: () => void) => {
   safeListeners.add(f);
   return () => void safeListeners.delete(f);
 };
+
+/** The safe-area boxes as SVG markup, for putting into a downloaded picture. */
+export function safeLinesMarkup(width: number, height: number): string {
+  const sw = Math.max(2, Math.round(width / 960));
+  const fs = sw * 8;
+  return safeAreas(width, height)
+    .map((a) => {
+      const col = a.id === "action" ? "#f59e0b" : "#22d3ee";
+      const tx = a.id === "action" ? a.x + a.width - sw * 3 : a.x + sw * 3;
+      const anchor = a.id === "action" ? "end" : "start";
+      return (
+        `<rect x="${a.x}" y="${a.y}" width="${a.width}" height="${a.height}" fill="none" stroke="${col}" stroke-width="${sw}" stroke-dasharray="${sw * 6} ${sw * 4}"/>` +
+        `<text x="${tx}" y="${a.y + a.height - sw * 3}" text-anchor="${anchor}" fill="${col}" font-size="${fs}" font-family="monospace">${a.label}</text>`
+      );
+    })
+    .join("");
+}
+
+/** Add the safe-area boxes just before the closing tag of an SVG that is `width` x `height`. */
+export function addSafeLines(svg: string, width: number, height: number): string {
+  const i = svg.lastIndexOf("</svg>");
+  return i < 0 ? svg : svg.slice(0, i) + safeLinesMarkup(width, height) + svg.slice(i);
+}
+
+const SAFE_DL_KEY = "pixelplan.safe-in-downloads";
+export const readSafeInDownloads = (): boolean => {
+  try {
+    return localStorage.getItem(SAFE_DL_KEY) === "on";
+  } catch {
+    return false;
+  }
+};
+export function storeSafeInDownloads(on: boolean) {
+  try {
+    localStorage.setItem(SAFE_DL_KEY, on ? "on" : "off");
+  } catch {
+    /* kept for this visit only */
+  }
+  safeListeners.forEach((f) => f());
+}

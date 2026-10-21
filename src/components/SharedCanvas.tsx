@@ -1,5 +1,5 @@
 import { useMemo, useRef } from "react";
-import { SafeLinesSvg, SafeToggle, useSafeLines } from "./SafeLines";
+import { SafeLinesSvg, SafeToggle, useSafeInDownloads, useSafeLines } from "./SafeLines";
 import type { PatternInput } from "../utils/testPattern";
 import {
   MAX_CANVASES,
@@ -22,7 +22,7 @@ import {
   type CanvasSetup,
   type Placed,
 } from "../utils/sharedCanvas";
-import { safeAreas, videoFrames } from "../utils/videoFrames";
+import { addSafeLines, safeAreas, videoFrames } from "../utils/videoFrames";
 import { colourFor } from "./CabinetMap";
 import { Notice } from "./ui";
 
@@ -79,6 +79,7 @@ export default function SharedCanvas({ screens, setLayout, setup, setSetup, proj
   const patterns = new Map(screens.map((s) => [s.id, s.pattern]));
   const fixed = setup.mode !== "fit";
   const safeOn = useSafeLines();
+  const safeInFile = useSafeInDownloads();
   const safeLines = (size: { width: number; height: number }, box: { w: number; h: number }) => {
     const sa = safeAreas(size.width, size.height);
     return { xs: sa.flatMap((a) => [a.x, a.x + a.width - box.w]), ys: sa.flatMap((a) => [a.y, a.y + a.height - box.h]) };
@@ -150,7 +151,10 @@ export default function SharedCanvas({ screens, setLayout, setup, setSetup, proj
   const num = (v: string) => Math.max(0, Math.round(Number(v) || 0));
   const set = (patch: Partial<CanvasSetup>) => setSetup({ ...setup, ...patch });
 
-  const svgFor = (i: number) => combinedSvg(shown.filter((p) => p.canvas === i), patterns, sizes[i]);
+  const svgFor = (i: number) => {
+    const svg = combinedSvg(shown.filter((p) => p.canvas === i), patterns, sizes[i]);
+    return fixed && safeInFile ? addSafeLines(svg, sizes[i].width, sizes[i].height) : svg;
+  };
   const name = (i: number) => (count > 1 ? `${base}-${i + 1}` : base);
 
   return (

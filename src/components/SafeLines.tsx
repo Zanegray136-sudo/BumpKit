@@ -1,16 +1,26 @@
 import { useSyncExternalStore } from "react";
-import { onSafeLines, readSafeLines, safeAreas, storeSafeLines } from "../utils/videoFrames";
+import { onSafeLines, readSafeInDownloads, readSafeLines, safeAreas, storeSafeInDownloads, storeSafeLines } from "../utils/videoFrames";
 
 /** Whether to draw the SMPTE safe lines, remembered on this device and shared by every preview. */
 export const useSafeLines = () => useSyncExternalStore(onSafeLines, readSafeLines, () => true);
 
+/** Whether downloaded pictures include the safe lines. Off unless chosen. */
+export const useSafeInDownloads = () => useSyncExternalStore(onSafeLines, readSafeInDownloads, () => false);
+
 export function SafeToggle() {
   const on = useSafeLines();
+  const inFile = useSafeInDownloads();
   return (
-    <label className="inline-flex items-center gap-2 text-xs text-zinc-300">
-      <input type="checkbox" checked={on} onChange={(e) => storeSafeLines(e.target.checked)} aria-label="Show SMPTE safe lines" />
-      Safe lines (action 93%, title 90%)
-    </label>
+    <span className="inline-flex flex-wrap items-center gap-x-4 gap-y-1">
+      <label className="inline-flex items-center gap-2 text-xs text-zinc-300">
+        <input type="checkbox" checked={on} onChange={(e) => storeSafeLines(e.target.checked)} aria-label="Show SMPTE safe lines" />
+        Safe lines (action 93%, title 90%)
+      </label>
+      <label className="inline-flex items-center gap-2 text-xs text-zinc-300">
+        <input type="checkbox" checked={inFile} onChange={(e) => storeSafeInDownloads(e.target.checked)} aria-label="Draw safe lines in downloads" />
+        Draw them in downloads
+      </label>
+    </span>
   );
 }
 

@@ -17,7 +17,8 @@ import {
 import SharedCanvas, { type SharedScreen } from "./SharedCanvas";
 import StandardFrames from "./StandardFrames";
 import type { CanvasFrame, CanvasSetup } from "../utils/sharedCanvas";
-import { chosenFrame, placeWall, readFrameChoice, storeFrameChoice, wrapInFrame, type FrameChoice } from "../utils/videoFrames";
+import { useSafeInDownloads } from "./SafeLines";
+import { addSafeLines, chosenFrame, placeWall, readFrameChoice, storeFrameChoice, wrapInFrame, type FrameChoice } from "../utils/videoFrames";
 import { ModeSwitchGeneric, Select, Stat } from "./ui";
 
 const chips: [keyof PatternToggles, string][] = [
@@ -108,11 +109,13 @@ export default function CanvasPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [canvas, dataPlan, numberingMode, deferredTitle, stats, toggles, kind, walkOrder, walkAt]
   );
-  const outSvg = useMemo(
-    () => (screenFrame && frame ? wrapInFrame(patternSvg, screenFrame, frame) : patternSvg),
+  const safeInFile = useSafeInDownloads();
+  const outSvg = useMemo(() => {
+    if (!(screenFrame && frame)) return patternSvg;
+    const wrapped = wrapInFrame(patternSvg, screenFrame, frame);
+    return safeInFile ? addSafeLines(wrapped, frame.width, frame.height) : wrapped;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [patternSvg, screenFrame?.width, screenFrame?.height, screenFrame?.x, screenFrame?.y]
-  );
+  }, [patternSvg, screenFrame?.width, screenFrame?.height, screenFrame?.x, screenFrame?.y, safeInFile]);
   const kindInfo = utilityPatterns.find((u) => u.id === kind);
   // A blob URL avoids percent-encoding a multi-megabyte string.
   const [patternUrl, setPatternUrl] = useState("");

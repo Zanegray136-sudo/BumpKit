@@ -87,3 +87,15 @@ describe("SMPTE safe areas", () => {
     expect(title).toEqual({ id: "title", label: "Title safe 90%", x: 96, y: 54, width: 1728, height: 972 });
   });
 });
+
+import { addSafeLines } from "../src/utils/videoFrames";
+
+describe("safe lines in downloads", () => {
+  it("adds both boxes before the closing tag", () => {
+    const out = addSafeLines('<svg width="1920" height="1080"><rect/></svg>', 1920, 1080);
+    expect(out.endsWith("</svg>")).toBe(true);
+    expect(out.includes("Action safe 93%")).toBe(true);
+    expect(out.includes("Title safe 90%")).toBe(true);
+    expect(out.indexOf("<rect/>") < out.indexOf("Action safe")).toBe(true);
+  });
+});
