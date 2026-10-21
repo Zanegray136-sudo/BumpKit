@@ -11,15 +11,17 @@ import { emptyShow } from './utils/show'
 
 /** The hub is the front door: an empty address, or #/hub. Any page of the LED planner goes straight to it. */
 const SignalPage = lazy(() => import('./components/SignalPage'))
+const LightingPage = lazy(() => import('./components/LightingPage'))
 const TablePage = lazy(() => import('./components/TablePage'))
 const tableFor = () => tableModules.find((m) => window.location.hash === `#/${m.id}`)
 const isSignal = () => window.location.hash === '#/signal'
+const isLighting = () => window.location.hash === '#/lighting'
 const isHub = () => /^#?\/?(hub)?$/.test(window.location.hash)
 
 function Root({ App }: { App: ComponentType }) {
-  const [route, setRoute] = useState(() => (isSignal() ? 'signal' : tableFor() ? 'table' : isHub() ? 'hub' : 'app'))
+  const [route, setRoute] = useState(() => (isSignal() ? 'signal' : isLighting() ? 'lighting' : tableFor() ? 'table' : isHub() ? 'hub' : 'app'))
   useEffect(() => {
-    const on = () => setRoute(isSignal() ? 'signal' : tableFor() ? 'table' : isHub() ? 'hub' : 'app')
+    const on = () => setRoute(isSignal() ? 'signal' : isLighting() ? 'lighting' : tableFor() ? 'table' : isHub() ? 'hub' : 'app')
     window.addEventListener('hashchange', on)
     return () => window.removeEventListener('hashchange', on)
   }, [])
@@ -27,6 +29,13 @@ function Root({ App }: { App: ComponentType }) {
     return (
       <Suspense fallback={null}>
         <SignalPage />
+      </Suspense>
+    )
+  }
+  if (route === 'lighting') {
+    return (
+      <Suspense fallback={null}>
+        <LightingPage />
       </Suspense>
     )
   }

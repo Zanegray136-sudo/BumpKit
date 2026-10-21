@@ -1,6 +1,7 @@
 import { emptyDiagram, loadDiagram, parseDiagram, saveDiagram, type Diagram } from "./signal";
 import { loadGear, parseGear, saveGear } from "./gearLibrary";
 import { loadSets, loadVersions, parseSets, parseVersions, saveSets, saveVersions, type GearSet, type Version } from "./signalSaved";
+import { emptyLighting, fromOldRows, loadLighting, parseLighting, saveLighting, type Lighting } from "./lighting";
 import { TABLE_IDS, cleanRows, loadRows, saveRows, type Row } from "./tables";
 
 /** Everything in a show beyond the LED screens: the signal diagram, the lists and the saved gear. */
@@ -8,6 +9,7 @@ export type ShowData = {
   signal: Diagram;
   gear: ReturnType<typeof loadGear>;
   tables: Record<string, Row[]>;
+  lighting?: Lighting;
   /** Saved versions of the diagram and saved gear sets. Left out of share links to keep them short. */
   versions?: Version[];
   sets?: GearSet[];
@@ -15,7 +17,7 @@ export type ShowData = {
 
 export const emptyShow = (): ShowData => ({ signal: emptyDiagram(), gear: [], tables: {}, versions: [], sets: [] });
 
-const isEmpty = (s: ShowData) => s.signal.nodes.length === 0 && s.signal.zones.length === 0 && s.signal.notes.length === 0 && s.gear.length === 0 && Object.values(s.tables).every((r) => r.length === 0);
+const isEmpty = (s: ShowData) => s.signal.nodes.length === 0 && s.signal.zones.length === 0 && s.signal.notes.length === 0 && s.gear.length === 0 && Object.values(s.tables).every((r) => r.length === 0) && (s.lighting?.fixtures.length ?? 0) === 0;
 
 /** What this browser holds now. Null when there is nothing, so empty shows don't add to a file. */
 export function collectShow(extras = true): ShowData | null {
@@ -25,6 +27,8 @@ export function collectShow(extras = true): ShowData | null {
     if (rows.length) tables[id] = rows;
   }
   const s: ShowData = { signal: loadDiagram(), gear: loadGear(), tables };
+  const lighting = loadLighting();
+  if (lighting.fixtures.length) s.lighting = lighting;
   if (isEmpty(s)) return null;
   if (extras) {
     const versions = loadVersions();
@@ -38,7 +42,7 @@ export function collectShow(extras = true): ShowData | null {
 /** Reads the show part of a saved file. Anything unreadable is left out. */
 export function cleanShow(raw: unknown): ShowData | undefined {
   if (!raw || typeof raw !== "object") return undefined;
-  const o = raw as { signal?: unknown; gear?: unknown; tables?: unknown; versions?: unknown; sets?: unknown };
+  const o = raw as { signal?: unknown; gear?: unknown; tables?: unknown; versions?: unknown; sets?: unknown; lighting?: unknown };
   const tables: Record<string, Row[]> = {};
   if (o.tables && typeof o.tables === "object") {
     for (const id of TABLE_IDS) {
@@ -47,6 +51,9 @@ export function cleanShow(raw: unknown): ShowData | undefined {
     }
   }
   const s: ShowData = { signal: parseDiagram(o.signal), gear: parseGear(o.gear), tables };
+  // Files from before the lighting page kept it as a table.
+  const lighting = o.lighting ? parseLighting(o.lighting) : fromOldRows(o.tables && typeof o.tables === "object" ? cleanRows((o.tables as Record<string, unknown>).lighting) : []);
+  if (lighting.fixtures.length) s.lighting = lighting;
   if (isEmpty(s)) return undefined;
   const versions = parseVersions(o.versions);
   const sets = parseSets(o.sets);
@@ -60,6 +67,7 @@ export function applyShow(show: ShowData) {
   saveDiagram(show.signal);
   saveGear(show.gear);
   for (const id of TABLE_IDS) saveRows(id, show.tables[id] ?? []);
+  saveLighting(show.lighting ?? emptyLighting());
   // Older files and share links don't carry these, so they leave what's here alone.
   if (show.versions) saveVersions(show.versions);
   if (show.sets) saveSets(show.sets);

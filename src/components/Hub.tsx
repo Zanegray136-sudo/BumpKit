@@ -13,7 +13,7 @@ const modules: Module[] = [
   { id: "signal", name: "Signal diagram", blurb: "Server, processor, switcher and screens, with the cables between them. Exports a picture and a patch list.", href: "#/signal", status: "ready" },
   { id: "gear", name: "Gear list", blurb: "One list for the whole show. Pulls in your LED panels and signal diagram boxes.", href: "#/gear", status: "rough" },
   { id: "schedule", name: "Schedule", blurb: "Bump-in, rehearsal and show dates for each job.", href: "#/schedule", status: "rough" },
-  { id: "lighting", name: "Lighting", blurb: "Fixtures, channels and DMX addressing.", href: "#/lighting", status: "rough" },
+  { id: "lighting", name: "Lighting", blurb: "A fixture library with real DMX modes, auto-patching into universes, overlap checks, power, weight and a hang list.", href: "#/lighting", status: "ready" },
   { id: "audio", name: "Audio", blurb: "An input list with mics, stands and stage box patch.", href: "#/audio", status: "rough" },
   { id: "pyro", name: "Pyro", blurb: "A cue list with positions and safety distances.", href: "#/pyro", status: "rough" },
 ];

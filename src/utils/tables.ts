@@ -3,7 +3,8 @@ import { getViewShow } from "./viewShow";
 export type Row = Record<string, string>;
 
 /** The lists that live in a show, by id. */
-export const TABLE_IDS = ["gear", "schedule", "lighting", "audio", "pyro"] as const;
+/** Lighting has its own page and data now, so it is not one of these. */
+export const TABLE_IDS = ["gear", "schedule", "audio", "pyro"] as const;
 
 
 export type Column = {
