@@ -30,7 +30,7 @@ export default function AppStatus() {
       )}
       {update && (
         <div role="status" className="pointer-events-auto flex flex-wrap items-center gap-3 rounded-lg border border-sky-500/40 bg-zinc-900 px-3 py-2 text-sm text-sky-100 shadow-lg">
-          A new version of PixelPlan is ready.
+          A new version of Bumpkit is ready.
           <button type="button" className="btn-primary" onClick={() => window.location.reload()}>
             Reload
           </button>

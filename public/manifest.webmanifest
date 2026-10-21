@@ -1,7 +1,7 @@
 {
   "id": "./",
-  "name": "PixelPlan",
-  "short_name": "PixelPlan",
+  "name": "Bumpkit",
+  "short_name": "Bumpkit",
   "description": "Plan LED walls: data, power, rigging, cables, pick list and report.",
   "lang": "en",
   "dir": "ltr",

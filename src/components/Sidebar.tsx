@@ -17,6 +17,9 @@ export default function Sidebar({ current, onSelect, done, issues = {}, onInstal
       aria-label="Workflow"
       className="bg-zinc-900 border-r border-zinc-800 h-screen overflow-y-auto"
     >
+      <a href="#/hub" className="block px-4 pt-3 text-xs text-zinc-400 hover:text-zinc-100">
+        ‹ Bumpkit home
+      </a>
       <div className="h-14 flex items-center gap-2.5 px-4 border-b border-zinc-800">
         <span aria-hidden="true" className="grid grid-cols-2 gap-0.5 w-4 h-4">
           <span className="bg-blue-400 rounded-sm" />

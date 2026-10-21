@@ -1,8 +1,23 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { useEffect, useState, type ComponentType } from 'react'
+import Hub from './components/Hub'
 import './index.css'
 import { decodeProject } from './utils/shareLink'
 import { startSharedView } from './utils/sharedView'
+
+/** The hub is the front door: an empty address, or #/hub. Any page of the LED planner goes straight to it. */
+const isHub = () => /^#?\/?(hub)?$/.test(window.location.hash)
+
+function Root({ App }: { App: ComponentType }) {
+  const [hub, setHub] = useState(isHub)
+  useEffect(() => {
+    const on = () => setHub(isHub())
+    window.addEventListener('hashchange', on)
+    return () => window.removeEventListener('hashchange', on)
+  }, [])
+  return hub ? <Hub /> : <App />
+}
 
 /** Opens a shared link (if there is one), then starts the app. */
 async function boot() {
@@ -16,13 +31,15 @@ async function boot() {
     } else {
       // Open it for viewing. The project saved in this browser is left alone.
       startSharedView(file)
+      // A shared project opens in the planner, not the hub.
+      if (isHub()) window.location.hash = '/project'
     }
   }
   // Loaded after the link is handled, because the app reads the saved project when it starts.
   const { default: App } = await import('./App.tsx')
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <App />
+      <Root App={App} />
     </StrictMode>,
   )
 }

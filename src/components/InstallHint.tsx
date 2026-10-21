@@ -38,7 +38,7 @@ export default function InstallHint() {
   return (
     <div className="panel flex items-start justify-between gap-3" role="note">
       <p className="text-sm text-zinc-300">
-        Keep PixelPlan on your home screen: tap the <strong className="text-zinc-50">Share</strong> button in Safari, then{" "}
+        Keep Bumpkit on your home screen: tap the <strong className="text-zinc-50">Share</strong> button in Safari, then{" "}
         <strong className="text-zinc-50">Add to Home Screen</strong>. It opens full screen and works without a signal.
       </p>
       <button type="button" className="btn shrink-0" onClick={hide}>
