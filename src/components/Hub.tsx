@@ -5,20 +5,20 @@ type Module = {
   name: string;
   blurb: string;
   href?: string;
-  status: "ready" | "next" | "later";
+  status: "ready" | "rough" | "later";
 };
 
 const modules: Module[] = [
   { id: "led", name: "PixelPlan", blurb: "LED screens: data, power, rigging, cables, canvas, pick list, report and media server exports.", href: "#/project", status: "ready" },
   { id: "signal", name: "Signal diagram", blurb: "Server, processor, switcher and screens, with the cables between them. Exports a picture and a patch list.", href: "#/signal", status: "ready" },
-  { id: "gear", name: "Gear and patch lists", blurb: "One pick list and one patch list for the whole show.", status: "next" },
-  { id: "schedule", name: "Schedule", blurb: "Bump-in, rehearsal and show dates for each job.", status: "next" },
-  { id: "lighting", name: "Lighting", blurb: "Fixtures, DMX universes and power.", status: "later" },
-  { id: "audio", name: "Audio", blurb: "Consoles, stage boxes, speakers and patch.", status: "later" },
-  { id: "pyro", name: "Pyro", blurb: "Cues, firing modules and safety distances.", status: "later" },
+  { id: "gear", name: "Gear list", blurb: "One list for the whole show. Pulls in your LED panels and signal diagram boxes.", href: "#/gear", status: "rough" },
+  { id: "schedule", name: "Schedule", blurb: "Bump-in, rehearsal and show dates for each job.", href: "#/schedule", status: "rough" },
+  { id: "lighting", name: "Lighting", blurb: "Fixtures, channels and DMX addressing.", href: "#/lighting", status: "rough" },
+  { id: "audio", name: "Audio", blurb: "An input list with mics, stands and stage box patch.", href: "#/audio", status: "rough" },
+  { id: "pyro", name: "Pyro", blurb: "A cue list with positions and safety distances.", href: "#/pyro", status: "rough" },
 ];
 
-const label = { ready: "Open", next: "Coming next", later: "Planned" } as const;
+const label = { ready: "Open", rough: "Rough draft", later: "Planned" } as const;
 
 export default function Hub() {
   const saved = loadSaved();

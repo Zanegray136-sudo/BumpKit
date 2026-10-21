@@ -2,19 +2,22 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { lazy, Suspense, useEffect, useState, type ComponentType } from 'react'
 import Hub from './components/Hub'
+import { tableModules } from './data/modules'
 import './index.css'
 import { decodeProject } from './utils/shareLink'
 import { startSharedView } from './utils/sharedView'
 
 /** The hub is the front door: an empty address, or #/hub. Any page of the LED planner goes straight to it. */
 const SignalPage = lazy(() => import('./components/SignalPage'))
+const TablePage = lazy(() => import('./components/TablePage'))
+const tableFor = () => tableModules.find((m) => window.location.hash === `#/${m.id}`)
 const isSignal = () => window.location.hash === '#/signal'
 const isHub = () => /^#?\/?(hub)?$/.test(window.location.hash)
 
 function Root({ App }: { App: ComponentType }) {
-  const [route, setRoute] = useState(() => (isSignal() ? 'signal' : isHub() ? 'hub' : 'app'))
+  const [route, setRoute] = useState(() => (isSignal() ? 'signal' : tableFor() ? 'table' : isHub() ? 'hub' : 'app'))
   useEffect(() => {
-    const on = () => setRoute(isSignal() ? 'signal' : isHub() ? 'hub' : 'app')
+    const on = () => setRoute(isSignal() ? 'signal' : tableFor() ? 'table' : isHub() ? 'hub' : 'app')
     window.addEventListener('hashchange', on)
     return () => window.removeEventListener('hashchange', on)
   }, [])
@@ -24,6 +27,16 @@ function Root({ App }: { App: ComponentType }) {
         <SignalPage />
       </Suspense>
     )
+  }
+  if (route === 'table') {
+    const mod = tableFor()
+    if (mod) {
+      return (
+        <Suspense fallback={null}>
+          <TablePage key={mod.id} mod={mod} />
+        </Suspense>
+      )
+    }
   }
   return route === 'hub' ? <Hub /> : <App />
 }
