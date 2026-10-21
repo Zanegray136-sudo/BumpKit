@@ -31,14 +31,14 @@ const startDrag = (e: React.DragEvent, d: Dragged) => {
   e.dataTransfer.effectAllowed = "copy";
 };
 
-const order = ["My gear", "Sets", "Switchers", "Media servers", "Routers", "Network", "Control", "LED processors", "Converters", "Sources", "Cameras", "Displays"];
+const order = ["My gear", "Sets", "Switchers", "Media servers", "Routers", "Recorders and keyers", "Network", "Control", "LED processors", "Converters", "Sources", "Cameras", "Displays"];
 
 function build(mine: Preset[]): Item[] {
   const out: Item[] = [];
   mine.forEach((p) => out.push({ key: `m:${p.name}`, preset: p, brand: "Saved by you", group: "My gear", summary: portSummary(p), note: p.note, source: p.source }));
   [...avGear, ...genericGear].forEach((g) => {
     const preset = presetOf(g);
-    out.push({ key: `g:${preset.name}`, preset, brand: g.brand, group: groupOf[g.kind], summary: portSummary(preset), note: g.note, source: g.source || undefined });
+    out.push({ key: `g:${preset.name}`, preset, brand: g.brand, group: g.group ?? groupOf[g.kind], summary: portSummary(preset), note: g.note, source: g.source || undefined });
   });
   processors.forEach((p) => {
     const preset: Preset = { name: `${p.manufacturer} ${p.model}`, kind: "processor", ins: 2, outs: Math.max(1, p.ethernetPorts), outType: "Cat6" };
@@ -124,6 +124,7 @@ export function GearPanel({ mine, sets, onAdd, onAddSet, onBlank, onRemoveMine, 
   const [adding, setAdding] = useState(false);
   const [q, setQ] = useState("");
   const [group, setGroup] = useState("All");
+  const [by, setBy] = useState<"type" | "brand">("type");
   const items = useMemo(() => build(mine), [mine]);
   const setItems = sets.filter((x) => `${x.name}`.toLowerCase().includes(q.toLowerCase()) && (group === "All" || group === "Sets"));
   const groups = useMemo(() => ["All", ...order.filter((g) => (g === "Sets" ? sets.length > 0 : items.some((i) => i.group === g)))], [items, sets]);
@@ -134,12 +135,27 @@ export function GearPanel({ mine, sets, onAdd, onAddSet, onBlank, onRemoveMine, 
     const brands = [...new Set(rows.map((r) => r.brand))];
     return brands.flatMap((b) => rows.filter((r) => r.brand === b));
   };
-  const sections = order.map((g) => ({ g, rows: byBrand(shown.filter((i) => i.group === g)) })).filter((s) => s.rows.length);
+  const brandSections = () => {
+    const rows = shown.filter((i) => i.group !== "My gear");
+    const names = [...new Set(rows.map((r) => r.brand))].sort((a, b) => (a === "Generic" ? 1 : b === "Generic" ? -1 : a.localeCompare(b)));
+    return [
+      ...order.filter((g) => g === "My gear").map((g) => ({ g, rows: shown.filter((i) => i.group === g) })),
+      ...names.map((b) => ({ g: b, rows: rows.filter((r) => r.brand === b) })),
+    ].filter((s) => s.rows.length);
+  };
+  const sections = by === "brand" ? brandSections() : order.map((g) => ({ g, rows: byBrand(shown.filter((i) => i.group === g)) })).filter((s) => s.rows.length);
 
   return (
     <aside className="panel order-3 flex min-h-0 flex-col gap-3 !p-3 lg:order-none" aria-label="Gear library">
       <h2 className="panel-title">Add gear</h2>
       <input className="input w-full" type="search" placeholder="Search brand or model" aria-label="Search gear" value={q} onChange={(e) => setQ(e.target.value)} />
+      <div className="flex gap-1 text-xs" role="group" aria-label="Group gear by">
+        {(["type", "brand"] as const).map((v) => (
+          <button key={v} type="button" aria-pressed={by === v} onClick={() => setBy(v)} className={`rounded-md border px-2 py-1 ${by === v ? "border-blue-500 bg-blue-500/20 text-blue-200" : "border-zinc-700 text-zinc-400 hover:text-zinc-100"}`}>
+            By {v}
+          </button>
+        ))}
+      </div>
       <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Gear groups">
         {groups.map((g) => (
           <button
@@ -182,11 +198,11 @@ export function GearPanel({ mine, sets, onAdd, onAddSet, onBlank, onRemoveMine, 
             <ul className="space-y-1">
               {s.rows.map((i, n) => (
                 <li key={i.key} className="flex flex-col gap-1">
-                  {i.group !== "My gear" && (n === 0 || s.rows[n - 1].brand !== i.brand) && <p className="pt-1 text-xs font-medium text-zinc-400">{i.brand}</p>}
+                  {by === "type" && i.group !== "My gear" && (n === 0 || s.rows[n - 1].brand !== i.brand) && <p className="pt-1 text-xs font-medium text-zinc-400">{i.brand}</p>}
                   <div className="flex items-stretch gap-1">
                   <button type="button" draggable onDragStart={(e) => startDrag(e, { preset: i.preset })} onClick={() => onAdd(i.preset)} title={i.note ? `${i.note} (Drag onto the diagram, or click to add.)` : "Drag onto the diagram, or click to add."} className="min-w-0 flex-1 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 text-left hover:border-zinc-600">
                     <span className="block truncate text-sm text-zinc-100">{i.group === "My gear" ? i.preset.name : i.preset.name.replace(`${i.brand} `, "")}</span>
-                    <span className="block truncate text-xs text-zinc-500">{i.summary}</span>
+                    <span className="block truncate text-xs text-zinc-500">{by === "brand" && i.group !== "My gear" ? `${i.group}  ·  ` : ""}{i.summary}</span>
                   </button>
                   {i.source && (
                     <a href={i.source} target="_blank" rel="noreferrer" className="grid w-7 shrink-0 place-items-center rounded-md border border-zinc-800 text-xs text-zinc-500 hover:text-zinc-100" title="Open the maker's spec page" aria-label={`Spec page for ${i.preset.name}`}>
