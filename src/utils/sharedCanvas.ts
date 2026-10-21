@@ -24,15 +24,22 @@ export type CanvasSetup = {
   mode: string;
   customW: number;
   customH: number;
+  /** Outputs across and down. Each canvas is this many frames wide and high (a 2 x 2 grid of 1080p is 3840 x 2160). */
+  across: number;
+  down: number;
 };
 
 export const MAX_CANVASES = 8;
-export const defaultCanvasSetup: CanvasSetup = { count: 1, mode: "uhd4k", customW: 3840, customH: 2160 };
+export const defaultCanvasSetup: CanvasSetup = { count: 1, mode: "uhd4k", customW: 3840, customH: 2160, across: 1, down: 1 };
+
+export const MAX_OUTPUTS_SIDE = 8;
+export const clampSide = (n: number) => Math.max(1, Math.min(MAX_OUTPUTS_SIDE, Math.round(Number.isFinite(n) ? n : 1)));
 
 export const clampCount = (n: number) => Math.max(1, Math.min(MAX_CANVASES, Math.round(Number.isFinite(n) ? n : 1)));
 
 /** The fixed size of every canvas, or null when canvases are sized to fit their screens. */
-export function canvasSize(setup: CanvasSetup): { width: number; height: number } | null {
+/** The size of one output: a standard frame or the custom size. Null when canvases fit their screens. */
+export function outputSize(setup: CanvasSetup): { width: number; height: number } | null {
   if (setup.mode === "fit") return null;
   if (setup.mode === "custom") {
     const w = Math.round(setup.customW);
@@ -41,6 +48,28 @@ export function canvasSize(setup: CanvasSetup): { width: number; height: number 
   }
   const f = videoFrames.find((x) => x.id === setup.mode);
   return f ? { width: f.width, height: f.height } : null;
+}
+
+/** The fixed size of every canvas (outputs across and down added up), or null when canvases are sized to fit their screens. */
+export function canvasSize(setup: CanvasSetup): { width: number; height: number } | null {
+  const o = outputSize(setup);
+  if (!o) return null;
+  return { width: o.width * clampSide(setup.across), height: o.height * clampSide(setup.down) };
+}
+
+/** Which outputs of a canvas a screen touches, as 1-based numbers counted left to right then down. */
+export function outputsTouched(p: { x: number; y: number; w: number; h: number }, setup: CanvasSetup): number[] {
+  const o = outputSize(setup);
+  const across = clampSide(setup.across);
+  const down = clampSide(setup.down);
+  if (!o || across * down < 2) return [];
+  const out: number[] = [];
+  const c0 = Math.floor(p.x / o.width);
+  const c1 = Math.floor((p.x + p.w - 1) / o.width);
+  const r0 = Math.floor(p.y / o.height);
+  const r1 = Math.floor((p.y + p.h - 1) / o.height);
+  for (let r = Math.max(0, r0); r <= Math.min(down - 1, r1); r++) for (let c = Math.max(0, c0); c <= Math.min(across - 1, c1); c++) out.push(r * across + c + 1);
+  return out;
 }
 
 /** Places screens that have no position left to right, wrapping at maxW. Placed screens stay where they are. */
@@ -162,22 +191,24 @@ export function positionsCsv(placed: Placed[]) {
  * pixel rectangle, right and bottom edges, and the same rectangle as 0 to 1 fractions of its canvas.
  * Each canvas also gets a row for its own size.
  */
-export function slicesCsv(placed: Placed[], sizes: { width: number; height: number }[]): string {
+export function slicesCsv(placed: Placed[], sizes: { width: number; height: number }[], setup?: CanvasSetup): string {
   const f = (n: number, of: number) => (of > 0 ? (n / of).toFixed(6) : "0");
-  const head = "Slice,Canvas,X,Y,Width,Height,Right,Bottom,Left (0-1),Top (0-1),Width (0-1),Height (0-1)";
+  const split = !!setup && outputsTouched({ x: 0, y: 0, w: 1, h: 1 }, setup).length > 0;
+  const head = "Slice,Canvas,X,Y,Width,Height,Right,Bottom,Left (0-1),Top (0-1),Width (0-1),Height (0-1)" + (split ? ",Outputs" : "");
   const rows = placed.map((p) => {
     const { width, height } = sizes[p.canvas] ?? { width: 0, height: 0 };
-    return [q(p.name), p.canvas + 1, p.x, p.y, p.w, p.h, p.x + p.w, p.y + p.h, f(p.x, width), f(p.y, height), f(p.w, width), f(p.h, height)].join(",");
+    return [q(p.name), p.canvas + 1, p.x, p.y, p.w, p.h, p.x + p.w, p.y + p.h, f(p.x, width), f(p.y, height), f(p.w, width), f(p.h, height)].concat(split ? [q(outputsTouched(p, setup!).join("+"))] : []).join(",");
   });
-  const canvases = sizes.map((c, i) => `${q(`Canvas ${i + 1}`)},${i + 1},0,0,${c.width},${c.height},${c.width},${c.height},0,0,1,1`);
+  const canvases = sizes.map((c, i) => `${q(`Canvas ${i + 1}`)},${i + 1},0,0,${c.width},${c.height},${c.width},${c.height},0,0,1,1${split ? "," : ""}`);
   return [head, ...rows, ...canvases].join("\n");
 }
 
-export function slicesJson(placed: Placed[], sizes: { width: number; height: number }[]): string {
+export function slicesJson(placed: Placed[], sizes: { width: number; height: number }[], setup?: CanvasSetup): string {
   return JSON.stringify(
     {
       canvases: sizes.map((c, i) => ({ canvas: i + 1, width: c.width, height: c.height })),
-      slices: placed.map((p) => ({ name: p.name, canvas: p.canvas + 1, x: p.x, y: p.y, width: p.w, height: p.h })),
+      ...(setup && outputSize(setup) ? { outputs: { width: outputSize(setup)!.width, height: outputSize(setup)!.height, across: clampSide(setup.across), down: clampSide(setup.down) } } : {}),
+      slices: placed.map((p) => ({ name: p.name, canvas: p.canvas + 1, x: p.x, y: p.y, width: p.w, height: p.h, ...(setup && outputsTouched(p, setup).length ? { outputs: outputsTouched(p, setup) } : {}) })),
     },
     null,
     2

@@ -100,3 +100,24 @@ describe("hard stop at the canvas edge", () => {
     expect(snapMove({ x: 270, y: 100 }, { w: 100, h: 100 }, { width: 3840, height: 2160 }, [], 8, { xs: [268], ys: [] })).toEqual({ x: 268, y: 100 });
   });
 });
+
+import { outputsTouched, outputSize } from "../src/utils/sharedCanvas";
+describe("outputs per canvas", () => {
+  const grid = { ...defaultCanvasSetup, mode: "hd1080", across: 2, down: 2 };
+  it("makes the canvas as big as the grid of outputs", () => {
+    expect(outputSize(grid)).toEqual({ width: 1920, height: 1080 });
+    expect(canvasSize(grid)).toEqual({ width: 3840, height: 2160 });
+  });
+  it("lists the outputs a screen touches", () => {
+    expect(outputsTouched({ x: 0, y: 0, w: 1920, h: 1080 }, grid)).toEqual([1]);
+    expect(outputsTouched({ x: 1000, y: 500, w: 1920, h: 1080 }, grid)).toEqual([1, 2, 3, 4]);
+    expect(outputsTouched({ x: 1920, y: 0, w: 100, h: 100 }, grid)).toEqual([2]);
+    expect(outputsTouched({ x: 0, y: 0, w: 100, h: 100 }, { ...grid, across: 1, down: 1 })).toEqual([]);
+  });
+  it("adds an Outputs column to the slices", () => {
+    const p = arrangeMulti([{ id: "a", name: "A", w: 1920, h: 1080, pos: { x: 1000, y: 0 } }], grid);
+    const lines = slicesCsv(p, canvasSizes(p, grid), grid).split("\n");
+    expect(lines[0].endsWith(",Outputs")).toBe(true);
+    expect(lines[1].endsWith('"1+2"')).toBe(true);
+  });
+});

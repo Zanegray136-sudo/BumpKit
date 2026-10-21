@@ -1,6 +1,7 @@
 import { jsPDF } from "jspdf";
 import type { ReportData, ReportOptions } from "./reportPdf";
 import { fmtKg, fmtMxM } from "./units";
+import { pickTotal } from "./pickList";
 
 export type ClientRow = {
   name: string;
@@ -17,6 +18,13 @@ export type ClientSummary = {
   rows: ClientRow[];
   totals: { screens: number; cabinets: number; kw: number; kg: number };
 };
+
+/** The priced pick list total for the hire period, or null when nothing has a price. */
+export function clientPrice(d: ReportData): { currency: string; days: number; total: number } | null {
+  const days = d.pricing?.days ?? 1;
+  const total = pickTotal(d.pickList, days);
+  return total > 0 ? { currency: d.pricing?.currency ?? "$", days, total } : null;
+}
 
 /** The few figures a client cares about, one row per screen. */
 export function clientSummary(d: ReportData): ClientSummary {
@@ -47,7 +55,7 @@ export function clientSummary(d: ReportData): ClientSummary {
 }
 
 /** A single-page summary for the client: no engineering detail, just what they are getting. */
-export function buildClientSummary(d: ReportData, paper: ReportOptions["paper"]): jsPDF {
+export function buildClientSummary(d: ReportData, paper: ReportOptions["paper"], opts: { price?: boolean } = {}): jsPDF {
   const doc = new jsPDF({ unit: "mm", format: paper });
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
@@ -79,6 +87,8 @@ export function buildClientSummary(d: ReportData, paper: ReportOptions["paper"])
     [`${totals.kw.toFixed(1)} kW`, "maximum power"],
     [fmtKg(totals.kg), "total weight"],
   ];
+  const price = opts.price ? clientPrice(d) : null;
+  if (price) tiles.push([`${price.currency}${price.total.toLocaleString("en-US", { maximumFractionDigits: 2 })}`, `estimate, ${price.days} day${price.days === 1 ? "" : "s"}`]);
   const tw = (W - M * 2) / tiles.length;
   tiles.forEach(([v, l], i) => {
     text(v, M + i * tw, 54, 18, "bold");
@@ -115,6 +125,7 @@ export function buildClientSummary(d: ReportData, paper: ReportOptions["paper"])
     lines.forEach((l, i) => text(l, M, y + 6 + i * 5, 9.5));
   }
 
+  if (price) text("Estimate from the priced items in the pick list. Items without a price are not included.", M, H - 22, 8, "normal", muted, "left", cw);
   text("Figures are planning values from manufacturer data. Final values are confirmed in the engineering report.", M, H - 16, 8, "normal", muted, "left", cw);
   text("Generated with PixelPlan", W / 2 - 18, H - 9, 8, "normal", muted);
   return doc;

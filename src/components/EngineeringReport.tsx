@@ -7,7 +7,7 @@ import {
   type ReportOptions,
   type ReportSectionId,
 } from "../utils/reportPdf";
-import { buildClientSummary } from "../utils/clientSummary";
+import { buildClientSummary, clientPrice } from "../utils/clientSummary";
 import { buildCabinetCsv, buildPortCsv } from "../utils/cabinetCsv";
 import { processorSheetText } from "../utils/processorSheet";
 import { Select } from "./ui";
@@ -113,9 +113,10 @@ export default function EngineeringReport({ data }: { data: ReportData }) {
     buildReport(data, options).save(`${base}${rev ? `-${rev}` : ""}.pdf`);
   };
 
+  const [withPrice, setWithPrice] = useState(false);
   const downloadClientSummary = () => {
     const base = (data.project.name || "Project").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-");
-    buildClientSummary(data, options.paper).save(`${base}-client-summary.pdf`);
+    buildClientSummary(data, options.paper, { price: withPrice && !!clientPrice(data) }).save(`${base}-client-summary.pdf`);
   };
 
   const saveCsv = (text: string, suffix: string, ext = "csv") => {
@@ -250,6 +251,12 @@ export default function EngineeringReport({ data }: { data: ReportData }) {
           <button type="button" className="btn w-full mt-2" onClick={downloadClientSummary} disabled={!data.screen}>
             One-page client summary
           </button>
+          {clientPrice(data) && (
+            <label className="mt-2 flex items-center gap-2 text-xs text-zinc-300">
+              <input type="checkbox" checked={withPrice} onChange={(e) => setWithPrice(e.target.checked)} />
+              Include the estimated price
+            </label>
+          )}
         </div>
       </div>
 

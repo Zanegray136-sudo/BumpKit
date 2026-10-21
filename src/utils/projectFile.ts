@@ -5,7 +5,7 @@ import { defaultToggles } from "./testPattern";
 import type { Units } from "./units";
 import { defaultContent, type Content } from "./content";
 import { defaultDistro, type DistroSettings } from "./distro";
-import { clampCount, defaultCanvasSetup, MAX_CANVASES, type CanvasSetup } from "./sharedCanvas";
+import { clampCount, clampSide, defaultCanvasSetup, MAX_CANVASES, type CanvasSetup } from "./sharedCanvas";
 import { videoFrames } from "./videoFrames";
 import { defaultCurve } from "./curve";
 import type { LedPanel } from "../data/ledPanels";
@@ -87,7 +87,7 @@ const cleanCanvasSetup = (v: unknown): CanvasSetup => {
   const o = isObj(v) ? v : {};
   const num = (x: unknown, d: number) => (typeof x === "number" && Number.isFinite(x) ? Math.max(16, Math.min(16384, Math.round(x))) : d);
   const mode = typeof o.mode === "string" && (o.mode === "fit" || o.mode === "custom" || videoFrames.some((f) => f.id === o.mode)) ? o.mode : "fit";
-  return { count: clampCount(typeof o.count === "number" ? o.count : 1), mode, customW: num(o.customW, defaultCanvasSetup.customW), customH: num(o.customH, defaultCanvasSetup.customH) };
+  return { count: clampCount(typeof o.count === "number" ? o.count : 1), mode, customW: num(o.customW, defaultCanvasSetup.customW), customH: num(o.customH, defaultCanvasSetup.customH), across: clampSide(typeof o.across === "number" ? o.across : 1), down: clampSide(typeof o.down === "number" ? o.down : 1) };
 };
 
 const cleanNames = (v: unknown): Record<string, string> => {

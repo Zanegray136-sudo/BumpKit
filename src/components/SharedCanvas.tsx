@@ -7,6 +7,10 @@ import {
   canvasSizes,
   clampCount,
   keepInside,
+  outputSize,
+  outputsTouched,
+  clampSide,
+  MAX_OUTPUTS_SIDE,
   combinedSvg,
   downloadCombinedPng,
   downloadCombinedSvg,
@@ -22,7 +26,7 @@ import {
   type CanvasSetup,
   type Placed,
 } from "../utils/sharedCanvas";
-import { addSafeLines, safeAreas, videoFrames } from "../utils/videoFrames";
+import { safeAreas, safeLinesMarkup, videoFrames } from "../utils/videoFrames";
 import { colourFor } from "./CabinetMap";
 import { Notice } from "./ui";
 
@@ -66,7 +70,7 @@ type Drag = {
 /** Every screen on one or more canvases, for media servers that drive them from shared outputs. Screens can be dragged. */
 export default function SharedCanvas({ screens, setLayout, setup, setSetup, projectName }: Props) {
   const items: CanvasItem[] = screens.map((s) => ({ id: s.id, name: s.name, w: s.pattern.canvas.width, h: s.pattern.canvas.height, pos: s.pos, canvas: s.canvas }));
-  const key = items.map((i) => `${i.id}:${i.w}x${i.h}:${i.pos?.x},${i.pos?.y}:${i.canvas}`).join("|") + `|${setup.count}|${setup.mode}|${setup.customW}x${setup.customH}`;
+  const key = items.map((i) => `${i.id}:${i.w}x${i.h}:${i.pos?.x},${i.pos?.y}:${i.canvas}`).join("|") + `|${setup.count}|${setup.mode}|${setup.customW}x${setup.customH}|${setup.across}x${setup.down}`;
   const placed = useMemo(() => arrangeMulti(items, setup), [key]); // eslint-disable-line react-hooks/exhaustive-deps
   const live = canvasSizes(placed, setup);
   const count = clampCount(setup.count);
@@ -75,14 +79,30 @@ export default function SharedCanvas({ screens, setLayout, setup, setSetup, proj
   const shown: Placed[] = placed;
   const clash = overlaps(shown);
   const spill = outside(shown, sizes);
+  const span = shown.filter((p) => outputsTouched(p, setup).length > 1);
   const base = `${(projectName || "project").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-")}-canvas`;
   const patterns = new Map(screens.map((s) => [s.id, s.pattern]));
   const fixed = setup.mode !== "fit";
   const safeOn = useSafeLines();
+  const out1 = outputSize(setup);
+  const outW = out1?.width ?? 0;
+  const outH = out1?.height ?? 0;
+  const across = clampSide(setup.across);
+  const down = clampSide(setup.down);
+  const grid = fixed && across * down > 1;
   const safeInFile = useSafeInDownloads();
   const safeLines = (size: { width: number; height: number }, box: { w: number; h: number }) => {
-    const sa = safeAreas(size.width, size.height);
-    return { xs: sa.flatMap((a) => [a.x, a.x + a.width - box.w]), ys: sa.flatMap((a) => [a.y, a.y + a.height - box.h]) };
+    const sa = safeOn ? safeAreas(outW, outH) : [];
+    const xs: number[] = [];
+    const ys: number[] = [];
+    // Safe areas belong to each output, so every output of the grid gets its own set of lines.
+    for (let c = 0; c < across; c++) for (const a of sa) xs.push(c * outW + a.x, c * outW + a.x + a.width - box.w);
+    for (let r = 0; r < down; r++) for (const a of sa) ys.push(r * outH + a.y, r * outH + a.y + a.height - box.h);
+    // Output edges
+    for (let c = 1; c < across; c++) xs.push(c * outW, c * outW - box.w);
+    for (let r = 1; r < down; r++) ys.push(r * outH, r * outH - box.h);
+    void size;
+    return { xs, ys };
   };
 
   /** Fix every screen that is still auto-placed where it now sits, so dragging one does not shift the rest. */
@@ -111,7 +131,7 @@ export default function SharedCanvas({ screens, setLayout, setup, setSetup, proj
     let raw = { x: Math.max(0, Math.round(d.fromX + (e.clientX - d.startX) * d.scale)), y: Math.max(0, Math.round(d.fromY + (e.clientY - d.startY) * d.scale)) };
     if (!e.altKey) {
       const others = placed.filter((p) => p.canvas === d.canvas && p.id !== d.id);
-      const lines = fixed && safeOn ? safeLines(size, box) : undefined;
+      const lines = fixed ? safeLines(size, box) : undefined;
       raw = snapMove(raw, box, size, others, Math.round(8 * d.scale), lines);
     }
     // Hard stop at the canvas edge. A fit canvas has no fixed edge, so it can still grow.
@@ -153,7 +173,12 @@ export default function SharedCanvas({ screens, setLayout, setup, setSetup, proj
 
   const svgFor = (i: number) => {
     const svg = combinedSvg(shown.filter((p) => p.canvas === i), patterns, sizes[i]);
-    return fixed && safeInFile ? addSafeLines(svg, sizes[i].width, sizes[i].height) : svg;
+    if (!(fixed && safeInFile)) return svg;
+    // Each output of the grid has its own safe lines.
+    let marks = "";
+    for (let r = 0; r < down; r++) for (let c = 0; c < across; c++) marks += `<g transform="translate(${c * outW} ${r * outH})">${safeLinesMarkup(outW, outH)}</g>`;
+    const end = svg.lastIndexOf("</svg>");
+    return svg.slice(0, end) + marks + svg.slice(end);
   };
   const name = (i: number) => (count > 1 ? `${base}-${i + 1}` : base);
 
@@ -168,10 +193,10 @@ export default function SharedCanvas({ screens, setLayout, setup, setSetup, proj
           <button type="button" className="btn" onClick={() => downloadCsv(positionsCsv(shown), base)}>
             Positions CSV
           </button>
-          <button type="button" className="btn" onClick={() => downloadCsv(slicesCsv(shown, sizes), `${base}-slices`)} title="Pixel and 0-1 values for a media server's slice or screen editor">
+          <button type="button" className="btn" onClick={() => downloadCsv(slicesCsv(shown, sizes, setup), `${base}-slices`)} title="Pixel and 0-1 values for a media server's slice or screen editor">
             Slices CSV
           </button>
-          <button type="button" className="btn" onClick={() => downloadJson(slicesJson(shown, sizes), `${base}-slices`)}>
+          <button type="button" className="btn" onClick={() => downloadJson(slicesJson(shown, sizes, setup), `${base}-slices`)}>
             Slices JSON
           </button>
         </div>
@@ -194,6 +219,18 @@ export default function SharedCanvas({ screens, setLayout, setup, setSetup, proj
             <option value="custom">Custom size</option>
           </select>
         </label>
+        {fixed && (
+          <>
+            <label className="text-sm text-zinc-400">
+              <span className="block text-xs">Outputs across</span>
+              <input type="number" className="input !w-20" min={1} max={MAX_OUTPUTS_SIDE} value={setup.across} aria-label="Outputs across" onChange={(e) => set({ across: clampSide(Number(e.target.value)) })} />
+            </label>
+            <label className="text-sm text-zinc-400">
+              <span className="block text-xs">Outputs down</span>
+              <input type="number" className="input !w-20" min={1} max={MAX_OUTPUTS_SIDE} value={setup.down} aria-label="Outputs down" onChange={(e) => set({ down: clampSide(Number(e.target.value)) })} />
+            </label>
+          </>
+        )}
         {setup.mode === "custom" && (
           <>
             <label className="text-sm text-zinc-400">
@@ -214,6 +251,19 @@ export default function SharedCanvas({ screens, setLayout, setup, setSetup, proj
       {fixed && (
         <div className="mt-2">
           <SafeToggle />
+        </div>
+      )}
+
+      {grid && (
+        <p className="mt-2 text-xs text-zinc-400">
+          {across} x {down} outputs of {outW} x {outH} px make each canvas {outW * across} x {outH * down} px. Screens snap to output edges.
+        </p>
+      )}
+      {span.length > 0 && (
+        <div className="mt-3">
+          <Notice kind="info">
+            Spans more than one output: {span.map((p) => `${p.name} (outputs ${outputsTouched(p, setup).join(", ")})`).join("; ")}. The server or processor needs to bridge those outputs.
+          </Notice>
         </div>
       )}
 
@@ -264,7 +314,22 @@ export default function SharedCanvas({ screens, setLayout, setup, setSetup, proj
                     Empty. Send a screen here from the table below.
                   </text>
                 )}
-                {fixed && <SafeLinesSvg width={size.width} height={size.height} unit={1 / scale} />}
+                {fixed &&
+                  Array.from({ length: down }, (_, r) =>
+                    Array.from({ length: across }, (_, c) => (
+                      <g key={`${r}-${c}`} transform={`translate(${c * outW} ${r * outH})`}>
+                        <SafeLinesSvg width={outW} height={outH} unit={1 / scale} />
+                        {grid && (
+                          <>
+                            <rect width={outW} height={outH} fill="none" stroke="#a1a1aa" strokeWidth={Math.max(2, 1.5 / scale)} strokeDasharray={`${14 / scale} ${8 / scale}`} pointerEvents="none" />
+                            <text x={10 / scale} y={22 / scale} fill="#a1a1aa" fontSize={16 / scale} fontWeight={600} pointerEvents="none">
+                              Output {r * across + c + 1}
+                            </text>
+                          </>
+                        )}
+                      </g>
+                    ))
+                  )}
                 {here.map((p) => {
                   const col = colourFor(screens.findIndex((s) => s.id === p.id) + 1);
                   return (

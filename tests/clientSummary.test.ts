@@ -19,3 +19,14 @@ describe("client summary", () => {
     expect(c.rows[0].power).toBe("2.4 kW");
   });
 });
+
+import { clientPrice } from "../src/utils/clientSummary";
+describe("client price", () => {
+  it("is null with no prices and totals priced items for the hire days", () => {
+    expect(clientPrice({ pickList: [{ key: "a", name: "A", total: 2, need: 2, spare: 0, note: "" }], pricing: { currency: "$", days: 3 } } as unknown as ReportData)).toBeNull();
+    const item = { key: "a", name: "A", total: 2, need: 2, spare: 0, note: "", unitPrice: 10 };
+    const p = clientPrice({ pickList: [item], pricing: { currency: "A$", days: 1 } } as unknown as ReportData);
+    expect(p?.currency).toBe("A$");
+    expect(p?.total).toBe(20);
+  });
+});
