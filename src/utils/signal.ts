@@ -460,6 +460,43 @@ export function autoLayout(d: Diagram): Diagram {
   return { ...d, nodes: d.nodes.map((n) => ({ ...n, ...(placed.get(n.id) ?? {}) })) };
 }
 
+/**
+ * Like autoLayout, but keeps each zone's boxes together. Every zone is laid out by itself, sized to fit,
+ * and the zones are lined up left to right in the order their boxes sit in the signal chain.
+ */
+export function autoLayoutZones(d: Diagram): Diagram {
+  if (d.nodes.length === 0 || d.zones.length === 0) return autoLayout(d);
+  const owner = new Map<string, string>();
+  d.zones.forEach((z) => nodesInZone(d, z.id).forEach((id) => !owner.has(id) && owner.set(id, z.id)));
+  const global = new Map(autoLayout(d).nodes.map((n) => [n.id, n.x]));
+  const groups = [...d.zones.map((z) => z.id), ""].map((zid) => ({ zid, members: d.nodes.filter((n) => (owner.get(n.id) ?? "") === zid) })).filter((g) => g.members.length > 0);
+  const avg = (ids: string[]) => ids.reduce((s, id) => s + (global.get(id) ?? 0), 0) / ids.length;
+  groups.sort((a, b) => (a.zid === "" ? 1 : b.zid === "" ? -1 : avg(a.members.map((n) => n.id)) - avg(b.members.map((n) => n.id))));
+  const PAD = 20;
+  const pos = new Map<string, { x: number; y: number }>();
+  const zoneBox = new Map<string, { x: number; y: number; w: number; h: number }>();
+  let cursor = 40;
+  for (const g of groups) {
+    const ids = new Set(g.members.map((n) => n.id));
+    const sub = autoLayout({ nodes: g.members, edges: d.edges.filter((e) => ids.has(e.from) && ids.has(e.to)), zones: [], notes: [] });
+    const minX = Math.min(...sub.nodes.map((n) => n.x));
+    const minY = Math.min(...sub.nodes.map((n) => n.y));
+    const maxX = Math.max(...sub.nodes.map((n) => n.x + NODE_W));
+    const maxY = Math.max(...sub.nodes.map((n) => n.y + nodeHeight(n)));
+    const top = g.zid ? 40 + ZONE_BAR + 16 : 40;
+    const left = g.zid ? cursor + PAD : cursor;
+    sub.nodes.forEach((n) => pos.set(n.id, { x: left + n.x - minX, y: top + n.y - minY }));
+    const w = maxX - minX + (g.zid ? PAD * 2 : 0);
+    if (g.zid) zoneBox.set(g.zid, { x: cursor, y: 40, w: Math.max(ZONE_MIN_W, w), h: Math.max(ZONE_MIN_H, maxY - minY + ZONE_BAR + 16 + PAD) });
+    cursor += Math.max(ZONE_MIN_W, w) + 60;
+  }
+  return {
+    ...d,
+    nodes: d.nodes.map((n) => ({ ...n, ...(pos.get(n.id) ?? {}) })),
+    zones: d.zones.map((z) => ({ ...z, ...(zoneBox.get(z.id) ?? {}) })),
+  };
+}
+
 const csvCell = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
 
 /** One row for every cable: where it starts and ends, on which ports, and what it is. */

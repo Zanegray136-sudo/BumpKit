@@ -20,7 +20,7 @@ export const canShare = () => typeof CompressionStream !== "undefined" && typeof
 
 /** The whole project squeezed into text that fits in a web address. */
 export async function encodeProject(p: ProjectFile): Promise<string> {
-  const raw = new TextEncoder().encode(JSON.stringify({ ...p, show: p.show ?? collectShow() ?? undefined }));
+  const raw = new TextEncoder().encode(JSON.stringify({ ...p, show: p.show ?? collectShow(false) ?? undefined }));
   return toB64Url(await pipe(raw, new CompressionStream("gzip")));
 }
 

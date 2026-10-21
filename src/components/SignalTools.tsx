@@ -1,16 +1,17 @@
 import { useState } from "react";
 import { downloadCableLabels } from "../utils/cableLabels";
 import type { Diagram } from "../utils/signal";
-import { diffDiagrams, cableCsv, cableList, gearCsv, gearList, labelRows, networkCsv, networkList, noChange, powerSummary } from "../utils/signalTools";
+import { diffDiagrams, rackLayout, cableCsv, cableList, gearCsv, gearList, labelRows, networkCsv, networkList, noChange, powerSummary } from "../utils/signalTools";
 import type { Version } from "../utils/signalSaved";
 import { downloadCsv } from "../utils/sharedCanvas";
 
-type Tab = "gear" | "cables" | "power" | "network" | "versions";
+type Tab = "gear" | "cables" | "power" | "racks" | "network" | "versions";
 
 const tabs: { id: Tab; label: string }[] = [
   { id: "gear", label: "Gear list" },
   { id: "cables", label: "Cable list" },
-  { id: "power", label: "Power and racks" },
+  { id: "power", label: "Power" },
+  { id: "racks", label: "Racks" },
   { id: "network", label: "Network" },
   { id: "versions", label: "Versions" },
 ];
@@ -32,9 +33,11 @@ export function SignalTools({ d, showName, base, versions, onSaveVersion, onRest
   const [tab, setTab] = useState<Tab>("gear");
   const [vname, setVname] = useState("");
   const [open, setOpen] = useState<string | null>(null);
+  const [rackSize, setRackSize] = useState(42);
   const gear = gearList(d);
   const cables = cableList(d);
   const power = powerSummary(d);
+  const racks = rackLayout(d, rackSize);
   const net = networkList(d);
 
   return (
@@ -159,6 +162,51 @@ export function SignalTools({ d, showName, base, versions, onSaveVersion, onRest
           )}
           {power.missing > 0 && d.nodes.length > 0 && <p className="text-xs text-amber-300">{power.missing} of {d.nodes.length} boxes have no watts entered, so the total is low.</p>}
           <p className="text-xs text-zinc-500">A box counts toward a zone when it sits inside it, so draw a zone around each rack or stage position.</p>
+        </div>
+      )}
+
+      {tab === "racks" && (
+        <div className="space-y-3">
+          <label className="flex items-center gap-2 text-xs text-zinc-400">
+            Rack size
+            <select className="input !w-auto !py-1 text-sm" value={rackSize} aria-label="Rack size" onChange={(e) => setRackSize(Number(e.target.value))}>
+              {[8, 12, 16, 24, 32, 42, 45].map((n) => (
+                <option key={n} value={n}>
+                  {n} U
+                </option>
+              ))}
+            </select>
+          </label>
+          {racks.length === 0 ? (
+            <p className="text-sm text-zinc-500">Draw a zone around your rack gear, give each box its rack units in its details, and the rack draws itself. Boxes stack top to bottom in the order they sit on the diagram.</p>
+          ) : (
+            <div className="flex flex-wrap gap-4">
+              {racks.map((r) => (
+                <figure key={r.zone} className="min-w-0">
+                  <figcaption className="mb-1 text-sm text-zinc-200">
+                    {r.zone} <span className={r.over ? "text-red-400" : "text-zinc-500"}>{r.used} of {r.size} U used{r.over ? ", too tall" : `, ${r.size - r.used} U free`}</span>
+                  </figcaption>
+                  <svg width={240} height={Math.max(r.size, r.used) * 16 + 8} role="img" aria-label={`${r.zone} rack`} className="rounded-md bg-zinc-900">
+                    <rect x={26} y={4} width={208} height={Math.max(r.size, r.used) * 16} fill="none" stroke="#52525b" />
+                    {Array.from({ length: Math.max(r.size, r.used) }, (_, i) => (
+                      <text key={i} x={20} y={4 + i * 16 + 12} fontSize={9} textAnchor="end" fill="#71717a">
+                        {i + 1}
+                      </text>
+                    ))}
+                    {r.items.map((it) => (
+                      <g key={it.id}>
+                        <rect x={28} y={4 + (it.startU - 1) * 16 + 1} width={204} height={it.u * 16 - 2} rx={2} fill={it.startU + it.u - 1 > r.size ? "#7f1d1d" : "#3f3f46"} stroke="#a1a1aa" />
+                        <text x={36} y={4 + (it.startU - 1) * 16 + Math.min(it.u * 16 - 2, 16) - 4} fontSize={11} fill="#f4f4f5">
+                          {it.name.length > 28 ? it.name.slice(0, 27) + "…" : it.name} ({it.u} U)
+                        </text>
+                      </g>
+                    ))}
+                  </svg>
+                  {r.skipped.length > 0 && <p className="mt-1 max-w-[240px] text-xs text-zinc-500">Not rack mounted: {r.skipped.join(", ")}</p>}
+                </figure>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

@@ -364,3 +364,29 @@ export function drawioXml(d: Diagram, title = "Signal diagram"): string {
   );
   return `<?xml version="1.0" encoding="UTF-8"?>\n<mxfile host="bumpkit"><diagram name="${xml(title)}" id="bumpkit"><mxGraphModel dx="1000" dy="600" grid="1" gridSize="10" pageWidth="1654" pageHeight="1169"><root>${cells.join("")}</root></mxGraphModel></diagram></mxfile>\n`;
 }
+
+// ---------- rack elevation ----------
+
+export type RackItem = { id: string; name: string; u: number; startU: number };
+export type Rack = { zone: string; items: RackItem[]; used: number; size: number; over: boolean; skipped: string[] };
+
+/** For every zone that holds rack gear: the boxes stacked top to bottom in the order they sit on the diagram. */
+export function rackLayout(d: Diagram, size = 42): Rack[] {
+  const racks: Rack[] = [];
+  d.zones.forEach((z) => {
+    const inside = nodesInZone(d, z.id)
+      .map((id) => d.nodes.find((n) => n.id === id)!)
+      .filter(Boolean);
+    const mounted = inside.filter((n) => (n.rackU ?? 0) > 0).sort((a, b) => a.y - b.y || a.x - b.x);
+    if (mounted.length === 0) return;
+    let at = 1;
+    const items = mounted.map((n) => {
+      const item = { id: n.id, name: n.label, u: Math.max(1, Math.round(n.rackU!)), startU: at };
+      at += item.u;
+      return item;
+    });
+    const used = at - 1;
+    racks.push({ zone: z.label || "Zone", items, used, size, over: used > size, skipped: inside.filter((n) => !(n.rackU && n.rackU > 0)).map((n) => n.label) });
+  });
+  return racks;
+}

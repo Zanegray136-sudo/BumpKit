@@ -209,3 +209,62 @@ describe("import and export", () => {
     expect(x.includes('<1>')).toBe(false);
   });
 });
+
+import { autoLayoutZones, nodeHeight, NODE_W, resizeZone } from "../src/utils/signal";
+import { rackLayout } from "../src/utils/signalTools";
+import { emptyShow } from "../src/utils/show";
+
+describe("zone-aware layout", () => {
+  it("keeps each zone's boxes inside it and lines the zones up", () => {
+    const { d, a, b, c, cam } = rig();
+    let g = addZone(d, 900, 900, "Stage").diagram;
+    g = addZone(g, 900, 1300, "FOH").diagram;
+    const [z1, z2] = g.zones;
+    g = moveNodes(g, [a, cam], 900 - 0 + 10, 900 + 40);
+    g = moveNodes(g, [b, c], 900 - 300 + 10, 1300 + 40 - 0);
+    g = { ...g, zones: g.zones.map((z) => ({ ...z, w: 400, h: 400 })) };
+    const out = autoLayoutZones(g);
+    const zone = (id: string) => out.zones.find((z) => z.id === id)!;
+    const inside = (nid: string, z: ReturnType<typeof zone>) => {
+      const n = out.nodes.find((x) => x.id === nid)!;
+      return n.x >= z.x && n.x + NODE_W <= z.x + z.w && n.y >= z.y && n.y + nodeHeight(n) <= z.y + z.h;
+    };
+    expect(inside(a, zone(z1.id)) && inside(cam, zone(z1.id))).toBe(true);
+    expect(inside(b, zone(z2.id)) && inside(c, zone(z2.id))).toBe(true);
+    expect(zone(z1.id).x !== zone(z2.id).x).toBe(true);
+    // zones don't overlap
+    const A = zone(z1.id);
+    const B = zone(z2.id);
+    expect(A.x + A.w <= B.x || B.x + B.w <= A.x).toBe(true);
+  });
+  it("falls back to the normal layout with no zones", () => {
+    const { d } = rig();
+    expect(autoLayoutZones(d).nodes.length).toBe(d.nodes.length);
+  });
+});
+
+describe("rack elevation", () => {
+  it("stacks rack gear top to bottom and flags a rack that is too full", () => {
+    let { d, a, b, c } = rig();
+    d = addZone(d, -20, -20, "Rack A").diagram;
+    d = resizeZone(d, d.zones[0].id, 900, 200);
+    d = patchNode(patchNode(patchNode(d, a, { rackU: 2 }), b, { rackU: 1 }), c, { rackU: 40 });
+    const racks = rackLayout(d, 42);
+    expect(racks.length).toBe(1);
+    expect(racks[0].items.map((i) => [i.name, i.startU])).toEqual([["Server", 1], ["Switch", 3], ["Screen", 4]]);
+    expect(racks[0].used).toBe(43);
+    expect(racks[0].over).toBe(true);
+    expect(rackLayout(d, 45)[0].over).toBe(false);
+  });
+  it("skips zones with no rack gear", () => {
+    const { d } = rig();
+    expect(rackLayout(addZone(d, 0, 0).diagram).length).toBe(0);
+  });
+});
+
+describe("versions travel with the project", () => {
+  it("empty show carries empty lists so a new project clears them", () => {
+    expect(emptyShow().versions).toEqual([]);
+    expect(emptyShow().sets).toEqual([]);
+  });
+});

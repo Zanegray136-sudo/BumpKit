@@ -32,7 +32,7 @@ import {
   labelLines,
   portCable,
   setPortTypes,
-  autoLayout,
+  autoLayoutZones,
   freeSpot,
   cableColour,
   cables,
@@ -836,7 +836,7 @@ export default function SignalPage() {
           <button type="button" className={`btn ${small}`} disabled={hist.current.future.length === 0} onClick={redo} aria-label="Redo">
             Redo ↷
           </button>
-          <button type="button" className={`btn ${small}`} disabled={d.nodes.length === 0} onClick={() => (commit(autoLayout(d)), setFitTick((t) => t + 1))}>
+          <button type="button" className={`btn ${small}`} disabled={d.nodes.length === 0} onClick={() => (commit(autoLayoutZones(d)), setFitTick((t) => t + 1))}>
             Auto layout
           </button>
           <button type="button" className={`btn ${small}`} onClick={() => setFitTick((t) => t + 1)}>

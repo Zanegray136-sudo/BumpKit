@@ -109,3 +109,28 @@ describe("show data in the project file", () => {
     endSharedView();
   });
 });
+
+import { addVersion } from "../src/utils/signalSaved";
+import { addNode as addN, emptyDiagram as emptyD } from "../src/utils/signal";
+import { cleanShow as cleanS, collectShow as collectS, applyShow as applyS } from "../src/utils/show";
+
+describe("versions and sets in the file", () => {
+  it("are collected for files, left out of share links, and read back", () => {
+    const d = addN(emptyD(), "server", 0, 0).diagram;
+    localStorage.setItem("bumpkit.signal", JSON.stringify(d));
+    localStorage.setItem("bumpkit.signal.versions", JSON.stringify(addVersion([], "Rehearsal", d, 1)));
+    expect(collectS(true)!.versions!.length).toBe(1);
+    expect(collectS(false)!.versions).toBe(undefined);
+    const back = cleanS(JSON.parse(JSON.stringify(collectS(true))))!;
+    localStorage.removeItem("bumpkit.signal.versions");
+    applyS(back);
+    expect(JSON.parse(localStorage.getItem("bumpkit.signal.versions")!).length).toBe(1);
+    localStorage.clear();
+  });
+  it("leave what is here alone when a file has none", () => {
+    localStorage.setItem("bumpkit.signal.versions", JSON.stringify(addVersion([], "Keep me", emptyD(), 1)));
+    applyS({ signal: addN(emptyD(), "server", 0, 0).diagram, gear: [], tables: {} });
+    expect(JSON.parse(localStorage.getItem("bumpkit.signal.versions")!).length).toBe(1);
+    localStorage.clear();
+  });
+});

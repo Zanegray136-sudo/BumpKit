@@ -1,4 +1,5 @@
 import { parseDiagram, type Diagram } from "./signal";
+import { getViewShow } from "./viewShow";
 import type { Fragment } from "./signalTools";
 
 const VERSIONS = "bumpkit.signal.versions";
@@ -40,8 +41,13 @@ export const addVersion = (list: Version[], name: string, d: Diagram, now: numbe
 
 export const removeVersion = (list: Version[], id: string): Version[] => list.filter((v) => v.id !== id);
 
-export const loadVersions = (): Version[] => parseVersions(read(VERSIONS));
-export const saveVersions = (list: Version[]) => write(VERSIONS, list);
+export const loadVersions = (): Version[] => {
+  const view = getViewShow<{ versions?: unknown }>();
+  return view ? parseVersions(view.versions) : parseVersions(read(VERSIONS));
+};
+export const saveVersions = (list: Version[]) => {
+  if (!getViewShow()) write(VERSIONS, list);
+};
 
 export function parseSets(v: unknown): GearSet[] {
   if (!Array.isArray(v)) return [];
@@ -60,5 +66,10 @@ export const addSet = (list: GearSet[], name: string, fragment: Fragment): GearS
   [...list.filter((s) => s.name !== name.trim()), { name: name.trim().slice(0, 60) || "Set", fragment }].sort((a, b) => a.name.localeCompare(b.name));
 export const removeSet = (list: GearSet[], name: string): GearSet[] => list.filter((s) => s.name !== name);
 
-export const loadSets = (): GearSet[] => parseSets(read(SETS));
-export const saveSets = (list: GearSet[]) => write(SETS, list);
+export const loadSets = (): GearSet[] => {
+  const view = getViewShow<{ sets?: unknown }>();
+  return view ? parseSets(view.sets) : parseSets(read(SETS));
+};
+export const saveSets = (list: GearSet[]) => {
+  if (!getViewShow()) write(SETS, list);
+};
