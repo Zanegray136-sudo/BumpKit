@@ -1,4 +1,5 @@
 import { useMemo, useRef } from "react";
+import { resolumeXml } from "../utils/resolumeXml";
 import { buildContentGuide } from "../utils/contentGuide";
 import { SafeLinesSvg, SafeToggle, useSafeInDownloads, useSafeLines } from "./SafeLines";
 import type { PatternInput } from "../utils/testPattern";
@@ -17,6 +18,7 @@ import {
   downloadCombinedSvg,
   downloadCsv,
   downloadJson,
+  downloadXml,
   outside,
   overlaps,
   positionsCsv,
@@ -181,6 +183,23 @@ export default function SharedCanvas({ screens, setLayout, setup, setSetup, proj
     const end = svg.lastIndexOf("</svg>");
     return svg.slice(0, end) + marks + svg.slice(end);
   };
+  const resolume = (i: number) => {
+    const here = shown.filter((p) => p.canvas === i);
+    const o = fixed ? { width: outW, height: outH } : sizes[i];
+    downloadXml(
+      resolumeXml({
+        name: `${projectName || "PixelPlan"} - Canvas ${i + 1}`,
+        canvasWidth: sizes[i].width,
+        canvasHeight: sizes[i].height,
+        outputWidth: o.width,
+        outputHeight: o.height,
+        across: fixed ? across : 1,
+        down: fixed ? down : 1,
+        slices: here.map((p) => ({ name: p.name, x: p.x, y: p.y, w: p.w, h: p.h })),
+      }),
+      `${name(i)}-resolume`
+    );
+  };
   const name = (i: number) => (count > 1 ? `${base}-${i + 1}` : base);
 
   return (
@@ -298,6 +317,9 @@ export default function SharedCanvas({ screens, setLayout, setup, setSetup, proj
                   {size.width} x {size.height} px, {here.length} screen{here.length === 1 ? "" : "s"}
                 </span>
                 <span className="flex gap-2">
+                  <button type="button" className="btn" disabled={here.length === 0} onClick={() => resolume(ci)} title="Resolume Arena Advanced Output preset: one screen per output, a slice for each LED screen">
+                    Resolume XML
+                  </button>
                   <button type="button" className="btn" disabled={here.length === 0} onClick={() => downloadCombinedSvg(svgFor(ci), name(ci))}>
                     SVG
                   </button>

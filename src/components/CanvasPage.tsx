@@ -14,6 +14,8 @@ import {
   type PatternInput,
   type PatternToggles,
 } from "../utils/testPattern";
+import { resolumeXml } from "../utils/resolumeXml";
+import { downloadXml } from "../utils/sharedCanvas";
 import SharedCanvas, { type SharedScreen } from "./SharedCanvas";
 import StandardFrames from "./StandardFrames";
 import type { CanvasFrame, CanvasSetup } from "../utils/sharedCanvas";
@@ -172,6 +174,30 @@ export default function CanvasPage({
               </button>
               <button type="button" className="btn" onClick={() => downloadPatternSvg(input, fileBase, outSvg)}>
                 Download SVG
+              </button>
+              <button
+                type="button"
+                className="btn"
+                title="Resolume Arena Advanced Output preset with this screen as one slice"
+                onClick={() => {
+                  const cw = screenFrame && frame ? frame.width : canvas.width;
+                  const ch = screenFrame && frame ? frame.height : canvas.height;
+                  downloadXml(
+                    resolumeXml({
+                      name: shown || "LED wall",
+                      canvasWidth: cw,
+                      canvasHeight: ch,
+                      outputWidth: cw,
+                      outputHeight: ch,
+                      across: 1,
+                      down: 1,
+                      slices: [{ name: shown || "LED wall", x: screenFrame?.x ?? 0, y: screenFrame?.y ?? 0, w: canvas.width, h: canvas.height }],
+                    }),
+                    `${fileBase}-resolume`
+                  );
+                }}
+              >
+                Resolume XML
               </button>
               {screenFrame && frame && (
                 <span className="text-xs text-zinc-400">On a {frame.name} canvas</span>

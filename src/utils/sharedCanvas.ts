@@ -242,6 +242,7 @@ function save(blob: Blob, name: string) {
 
 export const downloadCombinedSvg = (svg: string, name: string) => save(new Blob([svg], { type: "image/svg+xml" }), `${name}.svg`);
 export const downloadJson = (text: string, name: string) => save(new Blob([text], { type: "application/json" }), `${name}.json`);
+export const downloadXml = (text: string, name: string) => save(new Blob([text], { type: "application/xml" }), `${name}.xml`);
 export const downloadCsv = (csv: string, name: string) => save(new Blob([csv], { type: "text/csv" }), `${name}.csv`);
 
 export function downloadCombinedPng(svg: string, width: number, height: number, name: string) {
