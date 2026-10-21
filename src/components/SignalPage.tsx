@@ -26,6 +26,7 @@ import {
   ZONE_BAR,
   addPreset,
   cableBetween,
+  labelLines,
   portCable,
   setPortTypes,
   autoLayout,
@@ -102,9 +103,11 @@ const NodeView = memo(function NodeView({
       <text x={n.x + 22} y={n.y + 16} fontSize={10} fill="#71717a" pointerEvents="none">
         {kindLabel(n.kind).toUpperCase()}
       </text>
-      <text x={n.x + 22} y={n.y + 40} fontSize={13} fontWeight={600} fill="#18181b" pointerEvents="none">
-        {n.label.length > 19 ? n.label.slice(0, 18) + "…" : n.label}
-      </text>
+      {labelLines(n.label).map((l, i) => (
+        <text key={i} x={n.x + 22} y={n.y + 38 + i * 14} fontSize={12} fontWeight={600} fill="#18181b" pointerEvents="none">
+          {l}
+        </text>
+      ))}
       {Array.from({ length: n.ins }, (_, i) => {
         const p = portPos(n, "in", i);
         const free = wiring && !busy.has(i);

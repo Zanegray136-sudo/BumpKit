@@ -74,3 +74,25 @@ describe("per-port cable types", () => {
     expect(mine[0].inTypes!.length).toBe(16);
   });
 });
+
+import { labelLines } from "../src/utils/signal";
+describe("box names", () => {
+  it("fits long names on two lines", () => {
+    expect(labelLines("Roland V-160HD")).toEqual(["Roland V-160HD"]);
+    const l = labelLines("Blackmagic Design ATEM Television Studio HD8");
+    expect(l.length).toBe(2);
+    expect(l.every((x) => x.length <= 21)).toBe(true);
+    expect(labelLines("")).toEqual([""]);
+  });
+});
+
+describe("catalogue names on the diagram", () => {
+  it("every name fits two lines without being cut", () => {
+    for (const g of [...avGear, ...genericGear]) {
+      const name = presetOf(g).name;
+      const l = labelLines(name);
+      expect(l.join(" ").includes("…")).toBe(false);
+      expect(l.length <= 2).toBe(true);
+    }
+  });
+});

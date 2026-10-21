@@ -14,7 +14,7 @@ export type GearItem = {
   note?: string;
 };
 
-const BM = "Blackmagic Design";
+const BM = "Blackmagic";
 const bmAtem = "https://www.blackmagicdesign.com/developer/products/atem/techspecs";
 
 /**
@@ -46,7 +46,7 @@ export const avGear: GearItem[] = [
   { brand: BM, model: "Videohub 20x20 12G", kind: "other", ins: [[20, "SDI"]], outs: [[20, "SDI"]], source: "https://www.blackmagicdesign.com/ca/developer/products/videohub/techspecs" },
   { brand: BM, model: "Videohub 40x40 12G", kind: "other", ins: [[40, "SDI"]], outs: [[40, "SDI"]], source: "https://www.blackmagicdesign.com/ca/developer/products/videohub/techspecs" },
   { brand: BM, model: "Videohub 80x80 12G", kind: "other", ins: [[80, "SDI"]], outs: [[80, "SDI"]], source: "https://www.blackmagicdesign.com/ca/developer/products/videohub/techspecs" },
-  { brand: BM, model: "Smart Videohub CleanSwitch 12x12", kind: "other", ins: [[12, "SDI"]], outs: [[12, "SDI"]], source: "https://www.blackmagicdesign.com/ca/developer/products/videohub/techspecs", note: "SD, HD and 6G only, not 12G." },
+  { brand: BM, model: "Smart Videohub 12x12", kind: "other", ins: [[12, "SDI"]], outs: [[12, "SDI"]], source: "https://www.blackmagicdesign.com/ca/developer/products/videohub/techspecs", note: "SD, HD and 6G only, not 12G." },
 ];
 
 /** Generic starting points that are not tied to a brand. */

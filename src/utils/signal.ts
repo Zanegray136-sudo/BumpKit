@@ -257,6 +257,14 @@ export const moveNote = (d: Diagram, id: string, x: number, y: number): Diagram 
 export const removeNote = (d: Diagram, id: string): Diagram => ({ ...d, notes: d.notes.filter((n) => n.id !== id) });
 
 /** Breaks note text into lines that fit, keeping the person's own line breaks. At most 14 lines. */
+/** A box name on at most two lines, with … when it runs on. */
+export function labelLines(label: string, max = 21): string[] {
+  const lines = wrapText(label.trim(), max);
+  if (lines.length <= 2) return lines.length ? lines : [""];
+  const second = lines[1].length >= max ? lines[1].slice(0, max - 1) : lines[1];
+  return [lines[0], second + "…"];
+}
+
 export function wrapText(text: string, maxChars = 26): string[] {
   const out: string[] = [];
   for (const para of text.split("\n")) {
@@ -475,7 +483,7 @@ export function diagramSvg(d: Diagram, title = ""): string {
   for (const n of d.nodes) {
     parts.push(`<rect x="${n.x}" y="${n.y}" width="${NODE_W}" height="${nodeHeight(n)}" rx="8" fill="#f4f4f5" stroke="#3f3f46" stroke-width="1.5"/>`);
     parts.push(`<text x="${n.x + 22}" y="${n.y + 16}" font-size="10" fill="#71717a">${esc(kindLabel(n.kind).toUpperCase())}</text>`);
-    parts.push(`<text x="${n.x + 22}" y="${n.y + 40}" font-size="13" font-weight="600" fill="#18181b">${esc(n.label.length > 19 ? n.label.slice(0, 18) + "…" : n.label)}</text>`);
+    labelLines(n.label).forEach((l, i) => parts.push(`<text x="${n.x + 22}" y="${n.y + 38 + i * 14}" font-size="12" font-weight="600" fill="#18181b">${esc(l)}</text>`));
     for (let i = 0; i < n.ins; i++) {
       const p = portPos(n, "in", i);
       parts.push(`<circle cx="${p.x}" cy="${p.y}" r="5" fill="#ffffff" stroke="#3f3f46" stroke-width="1.5"/><text x="${p.x + 9}" y="${p.y + 3}" font-size="8" fill="#71717a">${i + 1}</text>`);

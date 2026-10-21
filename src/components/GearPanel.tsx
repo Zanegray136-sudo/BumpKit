@@ -66,10 +66,12 @@ export function GearPanel({ mine, onAdd, onBlank, onRemoveMine }: { mine: Preset
           <section key={s.g}>
             <h3 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">{s.g}</h3>
             <ul className="space-y-1">
-              {s.rows.map((i) => (
-                <li key={i.key} className="flex items-stretch gap-1">
+              {s.rows.map((i, n) => (
+                <li key={i.key} className="flex flex-col gap-1">
+                  {i.group !== "My gear" && (n === 0 || s.rows[n - 1].brand !== i.brand) && <p className="pt-1 text-xs font-medium text-zinc-400">{i.brand}</p>}
+                  <div className="flex items-stretch gap-1">
                   <button type="button" onClick={() => onAdd(i.preset)} title={i.note} className="min-w-0 flex-1 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 text-left hover:border-zinc-600">
-                    <span className="block truncate text-sm text-zinc-100">{i.preset.name}</span>
+                    <span className="block truncate text-sm text-zinc-100">{i.group === "My gear" ? i.preset.name : i.preset.name.replace(`${i.brand} `, "")}</span>
                     <span className="block truncate text-xs text-zinc-500">{i.summary}</span>
                   </button>
                   {i.source && (
@@ -82,6 +84,7 @@ export function GearPanel({ mine, onAdd, onBlank, onRemoveMine }: { mine: Preset
                       ✕
                     </button>
                   )}
+                  </div>
                 </li>
               ))}
             </ul>
