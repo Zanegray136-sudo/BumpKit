@@ -36,13 +36,15 @@ import {
   type PatchOptions,
   type SortBy,
 } from "../utils/lighting";
+import Network from "./Network";
 import StagePlan from "./StagePlan";
+import { netCsv } from "../utils/lightingNet";
 import { downloadMvr } from "../utils/mvr";
 import { downloadLightingPdf } from "../utils/lightingPdf";
 import { loadSaved } from "../utils/projectFile";
 import { downloadCsv } from "../utils/sharedCanvas";
 
-type Tab = "patch" | "trusses" | "plan" | "universes" | "power";
+type Tab = "patch" | "trusses" | "plan" | "network" | "universes" | "power";
 type AutoMode = "off" | "new" | "all";
 const allDefs: FixtureDef[] = [...libFixtures, ...genericFixtures];
 const defOf = (f: LFixture) => allDefs.find((d) => fixtureKey(d) === `${f.brand} ${f.model}`.trim());
@@ -204,6 +206,9 @@ export default function LightingPage() {
               <button type="button" className="menu-item" disabled={l.fixtures.length === 0} onClick={(e) => (downloadCsv(hangCsv(l), `${base}-lighting-hang-list`), closeMenu(e))}>
                 Hang list (CSV)
               </button>
+              <button type="button" className="menu-item" disabled={!l.net?.nodes.length} onClick={(e) => (downloadCsv(netCsv(l), `${base}-lighting-network`), closeMenu(e))}>
+                Network list (CSV)
+              </button>
               <button type="button" className="menu-item" disabled={l.fixtures.length === 0} onClick={(e) => (downloadMvr(l, `${base}-lighting`, showName), closeMenu(e))}>
                 grandMA3 patch (MVR)
               </button>
@@ -280,6 +285,7 @@ export default function LightingPage() {
                 ["patch", "Patch"],
                 ["trusses", "Trusses"],
                 ["plan", "Stage plan"],
+                ["network", "Network"],
                 ["universes", "Universes"],
                 ["power", "Power and weight"],
               ] as [Tab, string][]
@@ -350,6 +356,7 @@ export default function LightingPage() {
               />
             )}
             {tab === "plan" && <StagePlan l={l} onChange={(next) => commit(next)} onPick={(id) => (setSel([id]), setTab("patch"))} />}
+            {tab === "network" && <Network l={l} onChange={(next) => commit(next)} flash={flash} />}
             {tab === "universes" && <Universes l={l} sel={selSet} onPick={(id) => (setTab("patch"), setSel([id]))} onFill={(u) => flash(`First free run in universe ${u}: ${firstFree(l, u, 1) || "none"}.`)} />}
             {tab === "power" && <Power l={l} power={power} setPower={setPower} opts={opts} />}
           </section>

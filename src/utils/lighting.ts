@@ -35,7 +35,13 @@ export type LFixture = {
 export type Placement = { x: number; y: number; rot: number; len: number };
 export type Plan = { w: number; d: number; trusses: Record<string, Placement> };
 
+/** One DMX node (or console output) on the network. `ports` holds the universe each output sends, 0 for none. */
+export type NetNode = { id: string; name: string; model: string; ip: string; switchPort: string; ports: number[]; note: string };
+export type Net = { protocol: "artnet" | "sacn"; nodes: NetNode[] };
+
 export type Lighting = {
+  /** Nodes and how universes reach them. */
+  net?: Net;
   /** The stage plan: its size and where each truss sits. */
   plan?: Plan;
   fixtures: LFixture[];
@@ -125,7 +131,28 @@ export function parseLighting(raw: unknown): Lighting {
   const out: Lighting = positions ? { fixtures, positions } : { fixtures };
   const plan = parsePlan((raw as { plan?: unknown }).plan);
   if (plan) out.plan = plan;
+  const net = parseNet((raw as { net?: unknown }).net);
+  if (net) out.net = net;
   return out;
+}
+
+function parseNet(raw: unknown): Net | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const o = raw as { protocol?: unknown; nodes?: unknown };
+  const nodes: NetNode[] = [];
+  const ids = new Set<string>();
+  if (Array.isArray(o.nodes)) {
+    for (const r of o.nodes.slice(0, 200)) {
+      if (!r || typeof r !== "object") continue;
+      const n = r as Record<string, unknown>;
+      let id = str(n.id, 40);
+      if (!id || ids.has(id)) id = newFixtureId();
+      ids.add(id);
+      const ports = Array.isArray(n.ports) ? n.ports.slice(0, 64).map((v) => int(v, 0, 32768)) : [];
+      nodes.push({ id, name: str(n.name, 60), model: str(n.model, 80), ip: str(n.ip, 45), switchPort: str(n.switchPort, 40), ports: ports.length ? ports : [0], note: str(n.note, 200) });
+    }
+  }
+  return { protocol: o.protocol === "sacn" ? "sacn" : "artnet", nodes };
 }
 
 function parsePlan(raw: unknown): Plan | undefined {
@@ -578,7 +605,7 @@ export function hangList(l: Lighting): { position: string; fixture: string; mode
 
 // ---------------------------------------------------------------- export
 
-const csvCell = (s: string | number) => {
+export const csvCell = (s: string | number) => {
   const t = String(s);
   return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
 };

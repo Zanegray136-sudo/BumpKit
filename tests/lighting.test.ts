@@ -281,3 +281,43 @@ describe("stage plan", () => {
     expect(back.plan?.w).toBe(20);
   });
 });
+
+import { addNode, artnetAddress, assignUniverses, fillIps, netChecks, netCsv, netOf, sacnGroup, setNodePort } from "../src/utils/lightingNet";
+describe("network", () => {
+  const patched = () => autoPatch(addFixtures(addFixtures({ fixtures: [] }, genericFixtures[0], 0, 500), genericFixtures[0], 0, 500), { start: 1, newUniverseFor: "none" });
+  it("converts universes to Art-Net and sACN addresses", () => {
+    expect(artnetAddress(1).net + ":" + artnetAddress(1).sub + ":" + artnetAddress(1).uni).toBe("0:0:0");
+    expect(artnetAddress(17).sub).toBe(1);
+    expect(artnetAddress(257).net).toBe(1);
+    expect(sacnGroup(258)).toBe("239.255.1.2");
+  });
+  it("assigns used universes to outputs in order and numbers IPs", () => {
+    let l = patched();
+    const used = usage(l).length;
+    l = addNode(addNode(l, "Left", 2), "Right", 4);
+    l = assignUniverses(l);
+    const ports = netOf(l).nodes.flatMap((n) => n.ports);
+    expect(ports.filter(Boolean).length).toBe(used);
+    expect(ports[0]).toBe(1);
+    l = fillIps(l, "2.0.0.10");
+    expect(netOf(l).nodes.map((n) => n.ip).join()).toBe("2.0.0.10,2.0.0.11");
+    expect(netCsv(l).split("\n")[0].startsWith("Node,")).toBe(true);
+  });
+  it("flags shared IPs and universes nobody sends", () => {
+    let l = patched();
+    l = addNode(addNode(l, "A", 1), "B", 1);
+    l = fillIps(l, "2.0.0.5");
+    const ids = netOf(l).nodes.map((n) => n.id);
+    l = { ...l, net: { ...netOf(l), nodes: netOf(l).nodes.map((n) => ({ ...n, ip: "2.0.0.5" })) } };
+    l = setNodePort(l, ids[0], 0, 1);
+    const text = netChecks(l).map((c) => c.text).join("|");
+    expect(text.includes("share the IP")).toBe(true);
+    expect(netChecks(l).some((c) => c.text.includes("no node output sends it"))).toBe(true);
+  });
+  it("survives a saved show", () => {
+    const l = fillIps(addNode({ fixtures: [] }, "A", 2), "10.0.0.2");
+    const back = parseLighting(JSON.parse(JSON.stringify(l)));
+    expect(netOf(back).nodes[0].ip).toBe("10.0.0.2");
+    expect(netOf(back).nodes[0].ports.length).toBe(2);
+  });
+});
