@@ -27,7 +27,6 @@ import { calcViewing } from "./utils/viewing";
 import { backupState, fingerprint, loadRecord, recordSave, storeRecord, trackChange } from "./utils/backup";
 import BackupReminder from "./components/BackupReminder";
 import CurveSetup from "./components/CurveSetup";
-import CutoutEditor from "./components/CutoutEditor";
 import MixedSizes from "./components/MixedSizes";
 import TargetSize from "./components/TargetSize";
 import type { PickItem } from "./utils/pickList";
@@ -188,7 +187,6 @@ function App() {
   const setRedundancy = setter("redundancy");
   const setBackupSame = setter("backupSame");
   const setCustomChains = setter("customChains");
-  const setRemovedKeys = setter("removedKeys");
   const setPowerSettings = setter("powerSettings");
   const setCustomCircuits = setter("customCircuits");
   const setCanvasTitle = setter("canvasTitle");
@@ -864,7 +862,6 @@ function App() {
                   panelChosen={!!selectedPanel}
                   sizes={c.cabinetSizes}
                 />
-                <CutoutEditor wide={wide} high={high} removed={removed} setRemoved={setRemovedKeys} />
                 <SizeSetup
                   wide={wide}
                   setWide={setWide}
