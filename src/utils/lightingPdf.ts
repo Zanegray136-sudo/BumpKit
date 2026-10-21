@@ -1,4 +1,4 @@
-import { circuitPlan, endAddress, fmtAddress, hangList, onPosition, planOf, planPoints, positionOrder, positionTotals, sorted, totals, trussPlacement, usage, type Lighting, type PowerOptions } from "./lighting";
+import { circuitPlan, endAddress, legendOf, fmtAddress, hangList, onPosition, planOf, planPoints, positionOrder, positionTotals, sorted, totals, trussPlacement, usage, type Lighting, type PowerOptions } from "./lighting";
 import { netOf, netRows, netHeader, netChecks } from "./lightingNet";
 
 /** A landscape PDF: the patch list by address, the universes, then power, weight and the hang list. */
@@ -112,7 +112,7 @@ export async function downloadLightingPdf(l: Lighting, showName: string, fileBas
   if (l.fixtures.length) {
     const y0 = page("Stage plan (top view)");
     const availW = W - m * 2 - 10;
-    const availH = H - y0 - m - 8;
+    const availH = H - y0 - m - 14;
     const k = Math.min(availW / plan.w, availH / plan.d);
     const ox = m + 5 + (availW - plan.w * k) / 2;
     const oy = y0 + 4;
@@ -172,6 +172,22 @@ export async function downloadLightingPdf(l: Lighting, showName: string, fileBas
       doc.setFontSize(Math.min(7, rad * 2.4));
       doc.setTextColor(10, 10, 10);
       doc.text(q.onTruss ? String(q.slot) : "", X(q.x), Y(q.y) + rad * 0.35, { align: "center" });
+    }
+    // Key: one coloured dot per fixture type.
+    let kx = m + 5;
+    const ky = H - m + 1;
+    doc.setFontSize(7);
+    for (const e of legendOf(l).slice(0, 12)) {
+      const [r, g, b] = hsl(hue(e.key));
+      const text = `${e.count} x ${`${e.brand} ${e.model}`.trim()}`;
+      doc.setFillColor(r, g, b);
+      doc.setDrawColor(30, 30, 30);
+      doc.setLineWidth(0.15);
+      doc.circle(kx + 1.2, ky - 0.8, 1.2, "FD");
+      doc.setTextColor(60, 60, 60);
+      doc.text(text, kx + 3.4, ky);
+      kx += 5 + doc.getTextWidth(text);
+      if (kx > W - m - 30) break;
     }
     if (loose) {
       doc.setFontSize(7);

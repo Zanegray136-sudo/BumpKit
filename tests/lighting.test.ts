@@ -353,3 +353,55 @@ describe("heights, objects, colour and circuits", () => {
     expect(c[0].amps).toBe(12);
   });
 });
+
+import { applyLayout, autoLabel, closeGaps, duplicateTruss, legendOf, loadChecks, rigLayouts, swapFixtures } from "../src/utils/lighting";
+describe("more lighting tools", () => {
+  const def = { brand: "Robe", model: "Test", group: "Moving heads", modes: [{ name: "M", channels: 20 }], watts: 500, kg: 20 };
+  it("duplicates and mirrors a truss without copying addresses", () => {
+    let l = autoPatch(addFixtures({ fixtures: [] }, def, 0, 3, "Truss 1"));
+    l = placeTruss(l, "Truss 1", { x: 3, y: 2, rot: 20, len: 4 });
+    const m = duplicateTruss(l, "Truss 1", true);
+    expect(positionOrder(m).join()).toBe("Truss 1,Truss 1 mirror");
+    expect(onPosition(m, "Truss 1 mirror").length).toBe(3);
+    expect(onPosition(m, "Truss 1 mirror").every((f) => f.universe === 0)).toBe(true);
+    expect(trussPlacement(m, "Truss 1 mirror").x).toBe(9);
+    expect(trussPlacement(m, "Truss 1 mirror").rot).toBe(340);
+    const c = duplicateTruss(l, "Truss 1");
+    expect(positionOrder(c).join()).toBe("Truss 1,Truss 1 copy");
+    expect(c.fixtures.length).toBe(6);
+  });
+  it("swaps the fixture type and keeps the address", () => {
+    let l = autoPatch(addFixtures({ fixtures: [] }, def, 0, 2));
+    const before = l.fixtures[1].address;
+    l = swapFixtures(l, [l.fixtures[1].id], { ...def, model: "Other", modes: [{ name: "X", channels: 30 }] });
+    expect(l.fixtures[1].model).toBe("Other");
+    expect(l.fixtures[1].channels).toBe(30);
+    expect(l.fixtures[1].address).toBe(before);
+  });
+  it("labels by truss and by type", () => {
+    let l = addFixtures({ fixtures: [] }, def, 0, 2, "Truss 1");
+    expect(autoLabel(l, "truss").fixtures.map((f) => f.label).join()).toBe("T1-01,T1-02");
+    expect(autoLabel(l, "type").fixtures.map((f) => f.label).join()).toBe("Test 1,Test 2");
+    l = addFixtures(l, def, 0, 1, "Front truss");
+    expect(autoLabel(l, "truss").fixtures[2].label).toBe("FT-01");
+  });
+  it("closes gaps in a universe", () => {
+    let l = autoPatch(addFixtures({ fixtures: [] }, def, 0, 3), { gap: 5 });
+    l = closeGaps(l);
+    expect(l.fixtures.map((f) => f.address).join()).toBe("1,21,41");
+  });
+  it("warns when a truss is near or over its load limit", () => {
+    const rig = (n: number) => placeTruss(addFixtures({ fixtures: [] }, def, 0, n, "T"), "T", { maxKg: 120 });
+    expect(loadChecks(rig(7))[0].level).toBe("error");
+    expect(loadChecks(rig(5))[0].level).toBe("warn");
+    expect(loadChecks(rig(3)).length).toBe(0);
+    expect(loadChecks(addFixtures({ fixtures: [] }, def, 0, 1, "T")).length).toBe(0);
+  });
+  it("lists fixture types and applies a layout", () => {
+    let l = addFixtures(addFixtures({ fixtures: [] }, def, 0, 3), { ...def, model: "B" }, 0, 1);
+    expect(legendOf(l).map((x) => `${x.model}${x.count}`).join()).toBe("Test3,B1");
+    l = applyLayout(l, rigLayouts[1]);
+    expect(positionOrder(l).length).toBe(3);
+    expect(planOf(l).w).toBe(12);
+  });
+});

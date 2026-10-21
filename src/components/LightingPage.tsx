@@ -4,7 +4,14 @@ import {
   UNIVERSE,
   addFixtures,
   addPosition,
+  applyLayout,
+  autoLabel,
   autoPatch,
+  closeGaps,
+  duplicateTruss,
+  loadChecks,
+  rigLayouts,
+  swapFixtures,
   duplicateFixtures,
   endAddress,
   firstFree,
@@ -17,6 +24,8 @@ import {
   nudgeFixture,
   onPosition,
   placeFixtures,
+  placeTruss,
+  trussPlacement,
   positionOrder,
   removePosition,
   renamePosition,
@@ -132,7 +141,7 @@ export default function LightingPage() {
   };
 
   const opts = { volts: power.volts, breaker: power.breaker, load: power.load / 100 };
-  const checks = useMemo(() => patchChecks(l), [l]);
+  const checks = useMemo(() => [...patchChecks(l), ...loadChecks(l)].sort((a, b) => ({ error: 0, warn: 1, info: 2 })[a.level] - ({ error: 0, warn: 1, info: 2 })[b.level]), [l]);
   const tot = useMemo(() => totals(l, opts), [l, power]); // eslint-disable-line react-hooks/exhaustive-deps
   const positions = useMemo(() => positionOrder(l), [l]);
   const badIds = useMemo(() => new Set(checks.filter((c) => c.level === "error").flatMap((c) => c.ids)), [checks]);
@@ -279,6 +288,20 @@ export default function LightingPage() {
           <button type="button" className={`btn ${small}`} disabled={!l.fixtures.some((f) => f.universe)} onClick={() => (commit(unpatch(l)), flash("Cleared every address."))}>
             Clear patch
           </button>
+          <details className="relative">
+            <summary className={`btn cursor-pointer list-none ${small}`}>Tools ▾</summary>
+            <div className="absolute left-0 z-20 mt-1 w-64 space-y-1 rounded-lg border border-zinc-700 bg-zinc-900 p-1.5 text-sm shadow-xl">
+              <button type="button" className="menu-item" disabled={l.fixtures.length === 0} onClick={(e) => (commit(settle(autoLabel(l, "truss"), "structure")), flash("Labelled along each truss, like T1-01."), closeMenu(e))}>
+                Label by truss (T1-01…)
+              </button>
+              <button type="button" className="menu-item" disabled={l.fixtures.length === 0} onClick={(e) => (commit(autoLabel(l, "type")), flash("Labelled by type, like MegaPointe 1."), closeMenu(e))}>
+                Label by type (Spot 1…)
+              </button>
+              <button type="button" className="menu-item" disabled={!l.fixtures.some((f) => f.universe)} onClick={(e) => (commit(closeGaps(l)), flash("Closed the gaps in every universe."), closeMenu(e))}>
+                Close gaps in the patch
+              </button>
+            </div>
+          </details>
           <span className="mx-1 hidden h-5 w-px bg-zinc-700 sm:block" />
           <div className="flex gap-1" role="tablist" aria-label="Views">
             {(
@@ -327,6 +350,7 @@ export default function LightingPage() {
                   <BulkBar
                     count={sel.length}
                     positions={positions}
+                    onSwap={(d) => (commit(settle(swapFixtures(l, sel, d), "structure")), flash(`Swapped ${sel.length} to ${fixtureKey(d)}. Check the addresses still fit.`))}
                     onPosition={(p) => commit(settle(placeFixtures(l, sel, p), "structure"))}
                     onDuplicate={() => (commit(settle(duplicateFixtures(l, sel), "add")), flash(auto === "off" ? "Added a copy after each one. They have no address yet." : "Added a copy after each one and patched them."))}
                     onUnpatch={() => commit(unpatch(l, sel))}
@@ -578,12 +602,20 @@ function Library({ onAdd, onAddCustom, positions }: { onAdd: (d: FixtureDef, mod
 
 // ------------------------------------------------------------------ patch table
 
-function BulkBar({ count, positions, onPosition, onDuplicate, onUnpatch, onDelete, onClear }: { count: number; positions: string[]; onPosition: (p: string) => void; onDuplicate: () => void; onUnpatch: () => void; onDelete: () => void; onClear: () => void }) {
+function BulkBar({ count, positions, onSwap, onPosition, onDuplicate, onUnpatch, onDelete, onClear }: { count: number; positions: string[]; onSwap: (d: FixtureDef) => void; onPosition: (p: string) => void; onDuplicate: () => void; onUnpatch: () => void; onDelete: () => void; onClear: () => void }) {
   const [pos, setPos] = useState("");
   const [ask, setAsk] = useState(false);
   return (
     <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-blue-500/40 bg-blue-500/10 px-3 py-2 text-sm">
       <span className="text-blue-200">{count} selected</span>
+      <select className="input !w-40 !py-1" value="" aria-label="Swap the selected fixtures for another type" onChange={(e) => { const d = allDefs.find((x) => fixtureKey(x) === e.target.value); if (d) onSwap(d); }}>
+        <option value="">Swap to…</option>
+        {allDefs.map((d) => (
+          <option key={fixtureKey(d)} value={fixtureKey(d)}>
+            {fixtureKey(d)}
+          </option>
+        ))}
+      </select>
       <input className="input !w-36 !py-1" list="bulk-positions" placeholder="Move to position" aria-label="Position for the selected fixtures" value={pos} onChange={(e) => setPos(e.target.value)} />
       <datalist id="bulk-positions">
         {positions.map((p) => (
@@ -1023,6 +1055,22 @@ function Trusses({ l, auto, onChange, onPick }: { l: Lighting; auto: AutoMode; o
             Add truss
           </button>
         </form>
+        <select
+          className="input !w-52 !py-1.5"
+          value=""
+          aria-label="Start from a layout"
+          onChange={(e) => {
+            const g = rigLayouts.find((x) => x.id === e.target.value);
+            if (g) onChange(applyLayout(l, g));
+          }}
+        >
+          <option value="">Start from a layout…</option>
+          {rigLayouts.map((g) => (
+            <option key={g.id} value={g.id}>
+              {g.name}
+            </option>
+          ))}
+        </select>
         <p className="text-xs text-zinc-500">
           Drag fixtures into place, or use the arrows. {auto === "all" ? "Addresses follow the order you set here." : "Use Auto-patch with Truss order to give addresses in this order."}
         </p>
@@ -1065,12 +1113,23 @@ function Trusses({ l, auto, onChange, onPick }: { l: Lighting; auto: AutoMode; o
               <span className="text-xs text-zinc-500">
                 {list.length} fixtures, {watts} W, {Math.round(kg * 10) / 10} kg
               </span>
+              <label className="flex items-center gap-1 text-xs text-zinc-500">
+                Limit
+                <input className="input !w-20 !py-0.5" type="number" min={0} placeholder="kg" aria-label={`${p} load limit in kg`} value={trussPlacement(l, p).maxKg || ""} onChange={(e) => onChange(placeTruss(l, p, { maxKg: Number(e.target.value) || 0 }))} />
+                kg
+              </label>
               <span className="ml-auto flex gap-1">
                 <button type="button" className="btn !px-2 !py-0.5 text-xs" disabled={pi === 0} aria-label={`Move ${p} up`} onClick={() => onChange(movePosition(l, p, -1))}>
                   ▲
                 </button>
                 <button type="button" className="btn !px-2 !py-0.5 text-xs" disabled={pi === order.length - 1} aria-label={`Move ${p} down`} onClick={() => onChange(movePosition(l, p, 1))}>
                   ▼
+                </button>
+                <button type="button" className="btn !px-2 !py-0.5 text-xs" onClick={() => onChange(duplicateTruss(l, p))} title="Copy this truss and its fixtures. The copy has no addresses.">
+                  Duplicate
+                </button>
+                <button type="button" className="btn !px-2 !py-0.5 text-xs" onClick={() => onChange(duplicateTruss(l, p, true))} title="Copy it to the other side of the stage.">
+                  Mirror
                 </button>
                 <button type="button" className="btn !px-2 !py-0.5 text-xs" onClick={() => onChange(removePosition(l, p))} title="Delete the truss. Its fixtures stay in the show with no position.">
                   Delete

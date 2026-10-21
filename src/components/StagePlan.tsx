@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { addObject, fmtAddress, objectKinds, onPosition, patchObject, placeFixtureAt, placeTruss, planOf, planPoints, positionOrder, removeObject, setStage, trussPlacement, type Lighting, type PlanObject } from "../utils/lighting";
+import { addObject, fmtAddress, legendOf, objectKinds, onPosition, patchObject, placeFixtureAt, placeTruss, planOf, planPoints, positionOrder, removeObject, setStage, trussPlacement, type Lighting, type PlanObject } from "../utils/lighting";
 
 const hue = (s: string) => {
   let h = 0;
@@ -217,6 +217,16 @@ export default function StagePlan({ l, onChange, onPick }: { l: Lighting; onChan
         </svg>
       </div>
 
+      {l.fixtures.length > 0 && (
+        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-400" aria-label="Key">
+          {legendOf(l).map((e) => (
+            <li key={e.key} className="flex items-center gap-1.5">
+              <span className="inline-block h-3 w-3 rounded-full border border-zinc-900" style={{ background: `hsl(${hue(e.key)} 70% 55%)` }} />
+              {e.count} × {`${e.brand} ${e.model}`.trim()}
+            </li>
+          ))}
+        </ul>
+      )}
       {order.length === 0 && pts.length === 0 && <p className="text-sm text-zinc-500">Add fixtures from the list on the left, then give them a truss on the Trusses tab.</p>}
       {order.length > 0 && !cur && <p className="text-xs text-zinc-500">Drag a truss to move it. Click one to turn it or change its length.</p>}
       {cur && (
@@ -230,6 +240,9 @@ export default function StagePlan({ l, onChange, onPick }: { l: Lighting; onChan
           </label>
           <label className="flex items-center gap-1">
             Length (m) {field(cur.len, (n) => onChange(placeTruss(l, sel, { len: n })), 0.5, 100, 0.5)}
+          </label>
+          <label className="flex items-center gap-1">
+            Limit (kg) {field(cur.maxKg ?? 0, (n) => onChange(placeTruss(l, sel, { maxKg: n })), 0, 100000, 10)}
           </label>
           <label className="flex items-center gap-1">
             Height (m) {field(cur.h, (n) => onChange(placeTruss(l, sel, { h: n })), 0, 100, 0.5)}

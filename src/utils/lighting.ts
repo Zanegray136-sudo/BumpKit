@@ -34,7 +34,7 @@ export type LFixture = {
 };
 
 /** Where a truss sits on the stage plan. Metres from the stage's top left; rot is degrees; len is metres. */
-export type Placement = { x: number; y: number; rot: number; len: number; /** hang height in metres */ h: number };
+export type Placement = { x: number; y: number; rot: number; len: number; /** hang height in metres */ h: number; /** load limit in kg, 0 or missing for none */ maxKg?: number };
 /** Things on the stage that are not lights: risers, screens, FOH and so on. Sizes in metres. */
 export type PlanObject = { id: string; kind: "riser" | "screen" | "foh" | "marker" | "box"; name: string; x: number; y: number; w: number; d: number; rot: number };
 export type Plan = { w: number; d: number; trusses: Record<string, Placement>; objects?: PlanObject[] };
@@ -169,7 +169,7 @@ function parsePlan(raw: unknown): Plan | undefined {
     for (const [k, v] of Object.entries(o.trusses as Record<string, unknown>).slice(0, 200)) {
       if (!v || typeof v !== "object") continue;
       const p = v as Record<string, unknown>;
-      trusses[k.slice(0, 60)] = { x: num(p.x, -500, 500, 0), y: num(p.y, -500, 500, 0), rot: num(p.rot, -360, 360, 0), len: num(p.len, 0.5, 100, 4), h: num(p.h, 0, 100, 6) };
+      trusses[k.slice(0, 60)] = { x: num(p.x, -500, 500, 0), y: num(p.y, -500, 500, 0), rot: num(p.rot, -360, 360, 0), len: num(p.len, 0.5, 100, 4), h: num(p.h, 0, 100, 6), ...(num(p.maxKg, 0, 100000, 0) > 0 ? { maxKg: num(p.maxKg, 0, 100000, 0) } : {}) };
     }
   }
   const objects: PlanObject[] = [];
@@ -762,6 +762,7 @@ export function placeTruss(l: Lighting, name: string, patch: Partial<Placement>)
   next.y = r1(next.y);
   next.len = Math.max(0.5, Math.min(100, r1(next.len)));
   next.h = Math.max(0, Math.min(100, r1(next.h)));
+  if (next.maxKg !== undefined) next.maxKg = Math.max(0, Math.min(100000, Math.round(next.maxKg)));
   next.rot = ((Math.round(next.rot) % 360) + 360) % 360;
   return { ...l, plan: { ...p, trusses: { ...p.trusses, [name]: next } } };
 }
@@ -863,6 +864,143 @@ export function circuitPlan(l: Lighting, o: PowerOptions = {}): Circuit[] {
       cur.watts += f.watts;
       cur.amps = Math.round(((cur.watts / volts) * 10)) / 10;
     }
+  }
+  return out;
+}
+
+
+// ---------------------------------------------------------------- more tools
+
+const uniqueName = (taken: string[], base: string) => {
+  if (!taken.includes(base)) return base;
+  for (let n = 2; n < 1000; n++) if (!taken.includes(`${base} ${n}`)) return `${base} ${n}`;
+  return `${base} ${Date.now()}`;
+};
+
+/**
+ * Copies a truss and its fixtures (with no addresses). The copy goes after the original in the order.
+ * Mirrored copies sit on the other side of the stage's centre line.
+ */
+export function duplicateTruss(l: Lighting, name: string, mirror = false): Lighting {
+  const order = positionOrder(l);
+  const i = order.indexOf(name);
+  if (i < 0) return l;
+  const copyName = uniqueName(order, mirror ? `${name} mirror` : `${name} copy`);
+  const src = onPosition(l, name);
+  const t = trussPlacement(l, name);
+  const p = planOf(l);
+  const copies = src.map((f) => ({ ...f, id: newFixtureId(), universe: 0, address: 0, position: copyName, x: undefined, y: undefined }));
+  const clean = copies.map((f) => {
+    const { x: _x, y: _y, ...rest } = f;
+    return rest as LFixture;
+  });
+  const nextOrder = [...order.slice(0, i + 1), copyName, ...order.slice(i + 1)];
+  const placement: Placement = mirror ? { ...t, x: r1(p.w - t.x), rot: (360 - t.rot) % 360 } : { ...t, y: r1(Math.min(p.d, t.y + 1.5)) };
+  const out: Lighting = { ...l, positions: nextOrder, fixtures: [...l.fixtures, ...clean].slice(0, MAX_FIXTURES) };
+  out.plan = { ...p, trusses: { ...p.trusses, [name]: t, [copyName]: placement } };
+  return out;
+}
+
+/** Changes what the chosen fixtures are. Label, position, note, colour and address stay. */
+export function swapFixtures(l: Lighting, ids: string[], def: Pick<FixtureDef, "brand" | "model" | "group" | "modes" | "watts" | "kg">, modeIndex = 0): Lighting {
+  const want = new Set(ids);
+  const mode = def.modes[Math.max(0, Math.min(def.modes.length - 1, modeIndex))] ?? { name: "", channels: 1 };
+  return {
+    ...l,
+    fixtures: l.fixtures.map((f) =>
+      want.has(f.id) ? { ...f, brand: def.brand === "Generic" ? "" : def.brand, model: def.model, group: def.group, mode: mode.name, channels: mode.channels, watts: def.watts ?? 0, kg: def.kg ?? 0 } : f
+    ),
+  };
+}
+
+const abbr = (s: string) => {
+  const words = s.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "";
+  if (words.length === 1) return words[0].slice(0, 4).toUpperCase();
+  return words.map((w) => (/^\d+$/.test(w) ? w : w[0].toUpperCase())).join("");
+};
+
+/**
+ * Renames fixtures. "truss" gives T1-01, T1-02 along each truss in order; "type" gives "MegaPointe 1, 2..." counting each type.
+ * Only the given ids are renamed when ids is set.
+ */
+export function autoLabel(l: Lighting, style: "truss" | "type", ids?: string[]): Lighting {
+  const want = ids ? new Set(ids) : null;
+  const labels = new Map<string, string>();
+  if (style === "truss") {
+    for (const name of [...positionOrder(l), ""]) {
+      onPosition(l, name).forEach((f, i) => labels.set(f.id, `${name ? abbr(name) : "X"}-${String(i + 1).padStart(2, "0")}`));
+    }
+  } else {
+    const counts = new Map<string, number>();
+    for (const f of l.fixtures) {
+      const k = `${f.brand}|${f.model}`;
+      const n = (counts.get(k) ?? 0) + 1;
+      counts.set(k, n);
+      labels.set(f.id, `${f.model} ${n}`);
+    }
+  }
+  return { ...l, fixtures: l.fixtures.map((f) => (!want || want.has(f.id) ? { ...f, label: labels.get(f.id) ?? f.label } : f)) };
+}
+
+/** Packs each universe's fixtures back to back from channel 1, in address order. */
+export function closeGaps(l: Lighting): Lighting {
+  const next = new Map<string, number>();
+  const byU = new Map<number, LFixture[]>();
+  for (const f of l.fixtures) if (f.universe > 0) byU.set(f.universe, [...(byU.get(f.universe) ?? []), f]);
+  for (const [, list] of byU) {
+    let a = 1;
+    for (const f of [...list].sort((x, y) => x.address - y.address)) {
+      next.set(f.id, a);
+      a += f.channels;
+    }
+  }
+  return { ...l, fixtures: l.fixtures.map((f) => (next.has(f.id) ? { ...f, address: next.get(f.id)! } : f)) };
+}
+
+/** Truss weight against the limit set on each. Trusses with no limit are left alone. */
+export function loadChecks(l: Lighting): LightCheck[] {
+  const out: LightCheck[] = [];
+  for (const name of positionOrder(l)) {
+    const max = l.plan?.trusses[name]?.maxKg ?? 0;
+    if (!max) continue;
+    const list = onPosition(l, name);
+    const kg = Math.round(list.reduce((a, f) => a + f.kg, 0) * 10) / 10;
+    const missing = list.filter((f) => f.kg === 0).length;
+    const note = missing ? ` ${missing} fixture${missing === 1 ? " has" : "s have"} no weight listed, so the real load is higher.` : "";
+    if (kg > max) out.push({ level: "error", text: `${name} carries ${kg} kg against a limit of ${max} kg.${note}`, ids: list.map((f) => f.id) });
+    else if (kg > max * 0.8) out.push({ level: "warn", text: `${name} is at ${Math.round((kg / max) * 100)}% of its ${max} kg limit.${note}`, ids: list.map((f) => f.id) });
+  }
+  return out;
+}
+
+export type Legend = { key: string; brand: string; model: string; count: number };
+/** One row per fixture type in the rig, for the key on the plan. */
+export function legendOf(l: Lighting): Legend[] {
+  const m = new Map<string, Legend>();
+  for (const f of l.fixtures) {
+    const k = `${f.brand} ${f.model}`.trim();
+    const e = m.get(k) ?? { key: `${f.brand} ${f.model}`, brand: f.brand, model: f.model, count: 0 };
+    e.count++;
+    m.set(k, e);
+  }
+  return [...m.values()].sort((a, b) => b.count - a.count || a.model.localeCompare(b.model));
+}
+
+export type RigLayout = { id: string; name: string; blurb: string; w: number; d: number; trusses: { name: string; x: number; y: number; len: number; h: number; rot?: number }[] };
+export const rigLayouts: RigLayout[] = [
+  { id: "club", name: "Club (2 trusses)", blurb: "Back truss and a front truss", w: 8, d: 6, trusses: [{ name: "Back truss", x: 4, y: 1.5, len: 6, h: 4 }, { name: "Front truss", x: 4, y: 4.5, len: 6, h: 4.5 }] },
+  { id: "band", name: "Band stage (3 trusses)", blurb: "Back, mid and front trusses", w: 12, d: 8, trusses: [{ name: "Back truss", x: 6, y: 1.5, len: 10, h: 7 }, { name: "Mid truss", x: 6, y: 4, len: 10, h: 6 }, { name: "Front truss", x: 6, y: 6.5, len: 10, h: 5.5 }] },
+  { id: "festival", name: "Festival stage (5 trusses)", blurb: "Four rows and a downstage floor line", w: 20, d: 12, trusses: [{ name: "Truss 1", x: 10, y: 2, len: 16, h: 9 }, { name: "Truss 2", x: 10, y: 4.5, len: 16, h: 8.5 }, { name: "Truss 3", x: 10, y: 7, len: 16, h: 8 }, { name: "Truss 4", x: 10, y: 9.5, len: 16, h: 7.5 }, { name: "Floor line", x: 10, y: 11.2, len: 14, h: 0 }] },
+  { id: "stage-sides", name: "Stage with side booms", blurb: "Two rows and a boom each side", w: 14, d: 9, trusses: [{ name: "Back truss", x: 7, y: 2, len: 10, h: 7 }, { name: "Front truss", x: 7, y: 6, len: 10, h: 6 }, { name: "Boom left", x: 1.2, y: 4.5, len: 6, h: 3, rot: 90 }, { name: "Boom right", x: 12.8, y: 4.5, len: 6, h: 3, rot: 90 }] },
+];
+
+/** Sets the stage size and adds the layout's trusses, empty. Trusses that already exist keep their fixtures. */
+export function applyLayout(l: Lighting, layout: RigLayout): Lighting {
+  let out = setStage(l, layout.w, layout.d);
+  for (const t of layout.trusses) {
+    out = addPosition(out, t.name);
+    out = placeTruss(out, t.name, { x: t.x, y: t.y, len: t.len, h: t.h, rot: t.rot ?? 0 });
   }
   return out;
 }
