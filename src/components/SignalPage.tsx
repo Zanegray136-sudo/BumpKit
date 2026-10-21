@@ -1,8 +1,8 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Select } from "./ui";
-import { GearPanel } from "./GearPanel";
+import { DRAG_TYPE, GearPanel, type Dragged } from "./GearPanel";
 import { loadSaved } from "../utils/projectFile";
-import { addGear, loadGear, presetFromNode, processorPorts, removeGear, saveGear } from "../utils/gearLibrary";
+import { addGear, loadGear, parseGear, presetFromNode, processorPorts, removeGear, saveGear } from "../utils/gearLibrary";
 import { downloadSignalPdf } from "../utils/signalPdf";
 import { downloadCombinedPng, downloadCombinedSvg, downloadCsv } from "../utils/sharedCanvas";
 import {
@@ -562,6 +562,40 @@ export default function SignalPage() {
     const det = (e.currentTarget as HTMLElement).closest("details");
     if (det) det.open = false;
   };
+  const [dropping, setDropping] = useState(false);
+  const onDragOver = (e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes(DRAG_TYPE)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    setDropping(true);
+  };
+  const onDrop = (e: React.DragEvent) => {
+    setDropping(false);
+    const raw = e.dataTransfer.getData(DRAG_TYPE);
+    if (!raw) return;
+    e.preventDefault();
+    let item: Dragged;
+    try {
+      item = JSON.parse(raw) as Dragged;
+    } catch {
+      return;
+    }
+    const preset = "preset" in item ? parseGear([item.preset])[0] : undefined;
+    const kind = "kind" in item && kinds.some((k) => k.id === item.kind) ? item.kind : undefined;
+    if (!preset && !kind) return;
+    const p = toCanvas(e);
+    const x = Math.max(0, snapV(p.x - NODE_W / 2, e.altKey));
+    const y = Math.max(0, snapV(p.y - 29, e.altKey));
+    if (preset) {
+      const r = addPreset(d, preset, x, y);
+      commit(r.diagram);
+      setSel({ type: "node", id: r.id });
+    } else if (kind) {
+      const r = addNode(d, kind, x, y);
+      commit(r.diagram);
+      setSel({ type: "node", id: r.id });
+    }
+  };
   const exportSvg = diagramSvg(d, showName);
   const small = "!px-2.5 !py-1.5 text-sm";
 
@@ -659,12 +693,16 @@ export default function SignalPage() {
             onPointerMove={onMove}
             onPointerUp={onUp}
             onPointerCancel={onUp}
+            onDragOver={onDragOver}
+            onDragLeave={() => setDropping(false)}
+            onDrop={onDrop}
           >
+            {dropping && <div className="pointer-events-none absolute inset-0 z-10 rounded-lg border-2 border-dashed border-blue-500 bg-blue-500/5" aria-hidden />}
             {d.nodes.length === 0 && d.zones.length === 0 && d.notes.length === 0 && (
               <div className="absolute inset-0 grid place-items-center p-6 text-center">
                 <ol className="max-w-xs space-y-2 text-left text-sm text-zinc-500">
                   <li>
-                    <b className="text-zinc-700">1.</b> Pick gear from the list on the left, or search for a model.
+                    <b className="text-zinc-700">1.</b> Drag gear from the list on the left onto here, or click it to add. Search for a model if you can't see it.
                   </li>
                   <li>
                     <b className="text-zinc-700">2.</b> Drag from a filled dot on one box to a hollow dot on another to run a cable.

@@ -19,6 +19,16 @@ const groupOf: Record<NodeKind, string> = {
   other: "Routers",
 };
 
+/** What a drag from this panel carries. The canvas reads it on drop. */
+export const DRAG_TYPE = "application/x-bumpkit-gear";
+export type Dragged = { preset: Preset } | { kind: NodeKind };
+
+const startDrag = (e: React.DragEvent, d: Dragged) => {
+  e.dataTransfer.setData(DRAG_TYPE, JSON.stringify(d));
+  e.dataTransfer.setData("text/plain", "preset" in d ? d.preset.name : d.kind);
+  e.dataTransfer.effectAllowed = "copy";
+};
+
 const order = ["My gear", "Switchers", "Media servers", "Routers", "Network", "Control", "LED processors", "Converters", "Sources", "Cameras", "Displays"];
 
 function build(mine: Preset[]): Item[] {
@@ -72,7 +82,7 @@ export function GearPanel({ mine, onAdd, onBlank, onRemoveMine }: { mine: Preset
                 <li key={i.key} className="flex flex-col gap-1">
                   {i.group !== "My gear" && (n === 0 || s.rows[n - 1].brand !== i.brand) && <p className="pt-1 text-xs font-medium text-zinc-400">{i.brand}</p>}
                   <div className="flex items-stretch gap-1">
-                  <button type="button" onClick={() => onAdd(i.preset)} title={i.note} className="min-w-0 flex-1 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 text-left hover:border-zinc-600">
+                  <button type="button" draggable onDragStart={(e) => startDrag(e, { preset: i.preset })} onClick={() => onAdd(i.preset)} title={i.note ? `${i.note} (Drag onto the diagram, or click to add.)` : "Drag onto the diagram, or click to add."} className="min-w-0 flex-1 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 text-left hover:border-zinc-600">
                     <span className="block truncate text-sm text-zinc-100">{i.group === "My gear" ? i.preset.name : i.preset.name.replace(`${i.brand} `, "")}</span>
                     <span className="block truncate text-xs text-zinc-500">{i.summary}</span>
                   </button>
@@ -97,7 +107,7 @@ export function GearPanel({ mine, onAdd, onBlank, onRemoveMine }: { mine: Preset
         <p className="mb-1.5 text-xs text-zinc-400">Blank box</p>
         <div className="flex flex-wrap gap-1.5">
           {kinds.map((k) => (
-            <button key={k.id} type="button" className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:text-zinc-100" onClick={() => onBlank(k.id)}>
+            <button key={k.id} type="button" draggable onDragStart={(e) => startDrag(e, { kind: k.id })} className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:text-zinc-100" onClick={() => onBlank(k.id)}>
               {k.label}
             </button>
           ))}
