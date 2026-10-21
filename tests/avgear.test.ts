@@ -29,7 +29,7 @@ describe("gear catalogue", () => {
     expect(a.inTypes).toBe(undefined);
   });
   it("summarises ports", () => {
-    expect(portSummary(presetOf(avGear.find((g) => g.model === "V-160HD")!))).toBe("8 HDMI, 8 SDI in, 3 HDMI, 3 SDI out");
+    expect(portSummary(presetOf(avGear.find((g) => g.model === "V-160HD")!))).toBe("In 8 HDMI, 8 SDI  ·  Out 3 HDMI, 3 SDI");
     expect(portSummary({ name: "x", kind: "screen", ins: 0, outs: 0 })).toBe("no ports");
   });
 });

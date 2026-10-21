@@ -650,7 +650,7 @@ export default function SignalPage() {
           />
           <div
             ref={wrap}
-            className="relative min-w-0 overflow-hidden rounded-lg border border-zinc-800 bg-white"
+            className="relative order-1 min-w-0 overflow-hidden rounded-lg border border-zinc-800 bg-white lg:order-none"
             style={{ height: "68vh", minHeight: 360, touchAction: "none", cursor: "grab", userSelect: "none" }}
             onPointerDown={onBgDown}
             onPointerMove={onMove}
@@ -707,7 +707,7 @@ export default function SignalPage() {
             </svg>
           </div>
 
-          <aside className="space-y-3" aria-label="Details">
+          <aside className="order-2 space-y-3 lg:order-none" aria-label="Details">
             <div className="panel space-y-3">
               <h2 className="panel-title">{node ? "Box" : edge ? "Cable" : zone ? "Zone" : note ? "Note" : "New cables"}</h2>
               {zone && (

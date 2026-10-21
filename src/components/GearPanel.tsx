@@ -43,7 +43,7 @@ export function GearPanel({ mine, onAdd, onBlank, onRemoveMine }: { mine: Preset
   const sections = order.map((g) => ({ g, rows: shown.filter((i) => i.group === g) })).filter((s) => s.rows.length);
 
   return (
-    <aside className="panel flex min-h-0 flex-col gap-3 !p-3" aria-label="Gear library">
+    <aside className="panel order-3 flex min-h-0 flex-col gap-3 !p-3 lg:order-none" aria-label="Gear library">
       <h2 className="panel-title">Add gear</h2>
       <input className="input w-full" type="search" placeholder="Search brand or model" aria-label="Search gear" value={q} onChange={(e) => setQ(e.target.value)} />
       <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Gear groups">

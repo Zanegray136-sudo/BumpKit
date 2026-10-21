@@ -102,8 +102,8 @@ export function portSummary(p: Preset): string {
   };
   const i = side(p.ins, p.inType, p.inTypes);
   const o = side(p.outs, p.outType, p.outTypes);
-  if (i && o) return `${i} in, ${o} out`;
-  if (i) return `${i} in`;
-  if (o) return `${o} out`;
+  if (i && o) return `In ${i}  ·  Out ${o}`;
+  if (i) return `In ${i}`;
+  if (o) return `Out ${o}`;
   return "no ports";
 }
