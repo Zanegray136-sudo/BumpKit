@@ -892,6 +892,8 @@ function Trusses({ l, auto, onChange, onPick }: { l: Lighting; auto: AutoMode; o
 
   const chip = (f: LFixture, i: number, position: string, n: number) => {
     const h = hue(`${f.brand} ${f.model}`);
+    const col = `hsl(${h} 70% 55%)`;
+    const on = !!position;
     return (
       <div
         key={f.id}
@@ -901,25 +903,42 @@ function Trusses({ l, auto, onChange, onPick }: { l: Lighting; auto: AutoMode; o
           e.dataTransfer.effectAllowed = "move";
           e.dataTransfer.setData("text/plain", f.id);
         }}
-        onDragEnd={() => (drag.current = null, setOver(""))}
+        onDragEnd={() => ((drag.current = null), setOver(""))}
         onDragOver={(e) => (e.preventDefault(), setOver(`${position}:${i}`))}
         onDrop={(e) => (e.preventDefault(), e.stopPropagation(), drop(position, i))}
-        className={`group relative w-24 shrink-0 cursor-grab rounded-md border bg-zinc-900 p-1.5 text-xs ${over === `${position}:${i}` ? "border-blue-400" : "border-zinc-700"}`}
-        style={{ borderTopColor: `hsl(${h} 70% 55%)`, borderTopWidth: 3 }}
+        className={`relative w-24 shrink-0 cursor-grab rounded-sm text-center text-xs ${over === `${position}:${i}` ? "bg-blue-500/20" : ""}`}
       >
-        <button type="button" className="block w-full truncate text-left font-medium text-zinc-100 hover:underline" title={`${f.label} (open in patch)`} onClick={() => onPick(f.id)}>
-          {position ? `${i + 1}. ` : ""}
+        {on && (
+          <svg viewBox="0 0 96 30" className="block h-[30px] w-24" aria-hidden="true">
+            <g stroke="#a1a1aa" strokeWidth="1.5" fill="none">
+              <line x1="0" y1="4" x2="96" y2="4" strokeWidth="3" />
+              <line x1="0" y1="26" x2="96" y2="26" strokeWidth="3" />
+              <polyline points="0,26 24,4 48,26 72,4 96,26" />
+              <line x1="0" y1="4" x2="0" y2="26" />
+              <line x1="96" y1="4" x2="96" y2="26" />
+            </g>
+          </svg>
+        )}
+        <svg viewBox="0 0 96 46" className="block h-[46px] w-24" aria-hidden="true">
+          {on && <line x1="48" y1="0" x2="48" y2="8" stroke="#a1a1aa" strokeWidth="2" />}
+          <rect x="42" y="8" width="12" height="5" rx="1" fill="#71717a" />
+          <path d="M34 14 v16 a4 4 0 0 0 4 4 h20 a4 4 0 0 0 4 -4 v-16" fill="none" stroke="#71717a" strokeWidth="2.5" />
+          <circle cx="48" cy="26" r="11" fill={col} stroke="#18181b" strokeWidth="2" />
+          <circle cx="48" cy="26" r="5" fill="#fafafa" opacity="0.55" />
+        </svg>
+        <button type="button" className="block w-full truncate px-1 font-medium text-zinc-100 hover:underline" title={`${f.label} (open in patch)`} onClick={() => onPick(f.id)}>
+          {on ? `${i + 1}. ` : ""}
           {f.label || f.model}
         </button>
-        <div className="truncate text-zinc-400" title={`${f.brand} ${f.model}`}>
+        <div className="truncate px-1 text-zinc-400" title={`${f.brand} ${f.model}`}>
           {f.model}
         </div>
         <div className={f.universe ? "text-emerald-400" : "text-zinc-500"}>{f.universe ? fmtAddress(f.universe, f.address) : "no address"}</div>
-        <div className="mt-1 flex justify-between">
-          <button type="button" className="rounded px-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-30" disabled={i === 0 || !position} aria-label={`Move ${f.label} earlier`} onClick={() => onChange(nudgeFixture(l, f.id, -1))}>
+        <div className="flex justify-between px-1">
+          <button type="button" className="rounded px-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-30" disabled={i === 0 || !on} aria-label={`Move ${f.label} earlier`} onClick={() => onChange(nudgeFixture(l, f.id, -1))}>
             ◀
           </button>
-          <button type="button" className="rounded px-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-30" disabled={i === n - 1 || !position} aria-label={`Move ${f.label} later`} onClick={() => onChange(nudgeFixture(l, f.id, 1))}>
+          <button type="button" className="rounded px-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-30" disabled={i === n - 1 || !on} aria-label={`Move ${f.label} later`} onClick={() => onChange(nudgeFixture(l, f.id, 1))}>
             ▶
           </button>
         </div>
@@ -998,8 +1017,16 @@ function Trusses({ l, auto, onChange, onPick }: { l: Lighting; auto: AutoMode; o
                 </button>
               </span>
             </div>
-            <div className="flex min-h-[4.5rem] flex-wrap items-stretch gap-1.5 border-y-2 border-zinc-700 py-1.5">
-              {list.length === 0 && <span className="self-center px-2 text-xs text-zinc-500">Drop fixtures here</span>}
+            <div className="flex items-start overflow-x-auto pb-1">
+              {list.length === 0 && (
+                <svg viewBox="0 0 96 30" className="block h-[30px] w-24 shrink-0" aria-label="Empty truss. Drop fixtures here.">
+                  <g stroke="#52525b" strokeWidth="1.5" fill="none" strokeDasharray="4 3">
+                    <line x1="0" y1="4" x2="96" y2="4" />
+                    <line x1="0" y1="26" x2="96" y2="26" />
+                    <polyline points="0,26 24,4 48,26 72,4 96,26" />
+                  </g>
+                </svg>
+              )}
               {list.map((f, i) => chip(f, i, p, list.length))}
             </div>
           </div>
