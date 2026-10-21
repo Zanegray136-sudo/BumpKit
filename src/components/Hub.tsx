@@ -31,7 +31,7 @@ export default function Hub() {
       <header className="border-b border-zinc-800 bg-zinc-900">
         <div className="mx-auto max-w-5xl px-4 py-5 sm:px-6">
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-50">Bumpkit</h1>
-          <p className="mt-1 text-sm text-zinc-400">Plan the whole show: screens, signal, gear and schedule in one place.</p>
+          <p className="mt-1 text-sm text-zinc-400">Built by crew, for crew. Plan your next show end to end.</p>
         </div>
       </header>
 
