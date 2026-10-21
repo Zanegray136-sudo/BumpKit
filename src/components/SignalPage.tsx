@@ -31,6 +31,7 @@ import {
   cableBetween,
   labelLines,
   portCable,
+  cableShort,
   setPortTypes,
   autoLayoutZones,
   freeSpot,
@@ -140,6 +141,11 @@ const NodeView = memo(function NodeView({
             <text x={p.x + 10} y={p.y + 3} fontSize={8} fill="#71717a">
               {i + 1}
             </text>
+            {cableShort(portCable(n, "in", i)) && (
+              <text x={p.x - 9} y={p.y + 3} fontSize={8} fontWeight={700} textAnchor="end" fill={cableColour[portCable(n, "in", i)!]} stroke="#fff" strokeWidth={3} paintOrder="stroke" pointerEvents="none">
+                {cableShort(portCable(n, "in", i))}
+              </text>
+            )}
           </g>
         );
       })}
@@ -153,6 +159,11 @@ const NodeView = memo(function NodeView({
             <text x={p.x - 10} y={p.y + 3} fontSize={8} textAnchor="end" fill="#71717a" pointerEvents="none">
               {i + 1}
             </text>
+            {cableShort(portCable(n, "out", i)) && (
+              <text x={p.x + 9} y={p.y + 3} fontSize={8} fontWeight={700} textAnchor="start" fill={cableColour[portCable(n, "out", i)!]} stroke="#fff" strokeWidth={3} paintOrder="stroke" pointerEvents="none">
+                {cableShort(portCable(n, "out", i))}
+              </text>
+            )}
           </g>
         );
       })}

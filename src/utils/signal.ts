@@ -32,6 +32,10 @@ export const cableColour: Record<Cable, string> = {
   Other: "#52525b",
 };
 
+/** Short tag printed beside a port, e.g. "SDI". Empty when the cable is not known. */
+export const cableShort = (c: Cable | undefined): string =>
+  !c || c === "Other" ? "" : ({ HDMI: "HDMI", SDI: "SDI", DisplayPort: "DP", DVI: "DVI", Fibre: "FIBRE", Cat6: "CAT6", NDI: "NDI", USB: "USB" } as Record<string, string>)[c] ?? "";
+
 export type SigNode = {
   id: string;
   kind: NodeKind;
@@ -526,6 +530,9 @@ const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 export const edgeText = (e: SigEdge) => [e.cable, e.format !== "Other" ? e.format : "", e.length ? `${e.length} m` : "", e.label].filter(Boolean).join(" · ");
 
 /** The whole diagram as a picture on white, with a key for the cable colours. */
+const portTag = (x: number, y: number, anchor: "start" | "end", c: Cable | undefined) =>
+  cableShort(c) ? `<text x="${x}" y="${y + 3}" font-size="8" font-weight="700" text-anchor="${anchor}" fill="${cableColour[c!]}" stroke="#ffffff" stroke-width="3" paint-order="stroke">${cableShort(c)}</text>` : "";
+
 export function diagramSvg(d: Diagram, title = ""): string {
   const base = diagramBounds(d);
   const used = [...new Set(d.edges.map((e) => e.cable))];
@@ -559,11 +566,11 @@ export function diagramSvg(d: Diagram, title = ""): string {
     labelLines(n.label).forEach((l, i) => parts.push(`<text x="${n.x + 22}" y="${n.y + 38 + i * 14}" font-size="12" font-weight="600" fill="#18181b">${esc(l)}</text>`));
     for (let i = 0; i < n.ins; i++) {
       const p = portPos(n, "in", i);
-      parts.push(`<circle cx="${p.x}" cy="${p.y}" r="5" fill="#ffffff" stroke="#3f3f46" stroke-width="1.5"/><text x="${p.x + 9}" y="${p.y + 3}" font-size="8" fill="#71717a">${i + 1}</text>`);
+      parts.push(`<circle cx="${p.x}" cy="${p.y}" r="5" fill="#ffffff" stroke="${portCable(n, "in", i) ? cableColour[portCable(n, "in", i)!] : "#3f3f46"}" stroke-width="2"/><text x="${p.x + 9}" y="${p.y + 3}" font-size="8" fill="#71717a">${i + 1}</text>${portTag(p.x - 8, p.y, "end", portCable(n, "in", i))}`);
     }
     for (let i = 0; i < n.outs; i++) {
       const p = portPos(n, "out", i);
-      parts.push(`<circle cx="${p.x}" cy="${p.y}" r="5" fill="#3f3f46"/><text x="${p.x - 9}" y="${p.y + 3}" font-size="8" text-anchor="end" fill="#71717a">${i + 1}</text>`);
+      parts.push(`<circle cx="${p.x}" cy="${p.y}" r="5" fill="${portCable(n, "out", i) ? cableColour[portCable(n, "out", i)!] : "#3f3f46"}"/><text x="${p.x - 9}" y="${p.y + 3}" font-size="8" text-anchor="end" fill="#71717a">${i + 1}</text>${portTag(p.x + 8, p.y, "start", portCable(n, "out", i))}`);
     }
   }
   for (const n of d.notes) {

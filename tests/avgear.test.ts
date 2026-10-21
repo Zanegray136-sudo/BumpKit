@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { avGear, genericGear, portSummary, presetOf } from "../src/data/avGear";
-import { addPreset, cableBetween, connectPorts, diagramChecks, emptyDiagram, parseDiagram, portCable, setPorts, MAX_PORTS } from "../src/utils/signal";
+import { addNode, cableShort, diagramSvg, addPreset, cableBetween, connectPorts, diagramChecks, emptyDiagram, parseDiagram, portCable, setPorts, MAX_PORTS } from "../src/utils/signal";
 import { parseGear, presetFromNode } from "../src/utils/gearLibrary";
 
 describe("gear catalogue", () => {
@@ -94,5 +94,18 @@ describe("catalogue names on the diagram", () => {
       expect(l.join(" ").includes("…")).toBe(false);
       expect(l.length <= 2).toBe(true);
     }
+  });
+});
+
+describe("port tags", () => {
+  it("shortens cable names and prints them in the SVG", () => {
+    expect(cableShort("DisplayPort")).toBe("DP");
+    expect(cableShort("SDI")).toBe("SDI");
+    expect(cableShort("Other")).toBe("");
+    expect(cableShort(undefined)).toBe("");
+    const d = addNode(emptyDiagram(), "switcher", 0, 0);
+    const svg = diagramSvg({ ...d.diagram, nodes: d.diagram.nodes.map((x) => ({ ...x, inType: "SDI" as const, outType: "HDMI" as const })) });
+    expect(svg.includes(">SDI</text>")).toBe(true);
+    expect(svg.includes(">HDMI</text>")).toBe(true);
   });
 });
