@@ -145,7 +145,7 @@ describe("lists and files", () => {
     l = setPosition(l, [l.fixtures[0].id], "Truss 2");
     expect(hangList(l).map((r) => `${r.position}:${r.qty}`).join()).toBe("Truss 2:1,Truss 1:2");
     const csv = patchCsv(autoPatch(l));
-    expect(csv.split("\n")[0]).toBe("Unit,Label,Fixture,Mode,Channels,Universe,Address,Ends,Position,Watts,Weight (kg),Notes");
+    expect(csv.split("\n")[0]).toBe("Unit,Label,Fixture,Mode,Channels,Universe,Address,Ends,Position,Watts,Weight (kg),Notes,Colour");
     expect(csv.split("\n").length).toBe(5);
   });
   it("reads a patch CSV back", () => {
@@ -319,5 +319,37 @@ describe("network", () => {
     const back = parseLighting(JSON.parse(JSON.stringify(l)));
     expect(netOf(back).nodes[0].ip).toBe("10.0.0.2");
     expect(netOf(back).nodes[0].ports.length).toBe(2);
+  });
+});
+
+import { addObject, circuitPlan, patchObject, planOf, removeObject } from "../src/utils/lighting";
+describe("heights, objects, colour and circuits", () => {
+  it("keeps truss height and writes it into the MVR", () => {
+    let l = addFixtures({ fixtures: [] }, genericFixtures[0], 0, 1, "T");
+    expect(trussPlacement(l, "T").h).toBe(6);
+    l = placeTruss(l, "T", { h: 8.5 });
+    expect(mvrXml(l).includes(",8500}")).toBe(true);
+    expect(parseLighting(JSON.parse(JSON.stringify(l))).plan?.trusses.T.h).toBe(8.5);
+  });
+  it("adds, edits and removes stage objects and keeps them in a saved show", () => {
+    let l = addObject({ fixtures: [] }, "screen", "Upstage LED");
+    const id = planOf(l).objects![0].id;
+    l = patchObject(l, id, { x: 3.14, w: 8 });
+    expect(planOf(l).objects![0].x).toBe(3.1);
+    expect(parseLighting(JSON.parse(JSON.stringify(l))).plan?.objects?.[0].name).toBe("Upstage LED");
+    expect(planOf(removeObject(l, id)).objects!.length).toBe(0);
+  });
+  it("carries a colour note through the patch CSV", () => {
+    let l = addFixtures({ fixtures: [] }, genericFixtures[0], 0, 1);
+    l = patchFixture(l, l.fixtures[0].id, { colour: "L201" });
+    const back = importPatchCsv(patchCsv(l));
+    expect(back.fixtures[0].colour).toBe("L201");
+  });
+  it("splits fixtures onto circuits in truss order within the breaker rating", () => {
+    let l = addFixtures({ fixtures: [] }, { ...genericFixtures[0], watts: 920 }, 0, 5, "T1");
+    // 920 W at 230 V is 4 A. A 16 A breaker at 80% holds 12.8 A, so three fixtures to a circuit.
+    const c = circuitPlan(l, { volts: 230, breaker: 16, load: 0.8 });
+    expect(c.map((x) => x.fixtures.length).join()).toBe("3,2");
+    expect(c[0].amps).toBe(12);
   });
 });

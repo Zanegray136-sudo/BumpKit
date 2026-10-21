@@ -10,6 +10,7 @@ import {
   firstFree,
   fmtAddress,
   hangCsv,
+  circuitPlan,
   hangList,
   movePosition,
   moveFixture,
@@ -663,6 +664,7 @@ function PatchTable({
             <th className="px-1 py-2 font-medium">Position</th>
             <th className="px-1 py-2 text-right font-medium">Watts</th>
             <th className="px-1 py-2 text-right font-medium">Kg</th>
+            <th className="px-1 py-2 font-medium">Colour</th>
             <th className="px-1 py-2 font-medium">Notes</th>
           </tr>
         </thead>
@@ -731,6 +733,9 @@ function PatchTable({
                   <input className={num} type="number" min={0} step="0.1" value={f.kg || ""} aria-label="Weight in kilograms" onChange={(e) => onEdit(f.id, { kg: Number(e.target.value) }, `${f.id}kg`)} onBlur={onEndTyping} />
                 </td>
                 <td className="px-1 py-1" style={{ minWidth: "9rem" }}>
+                  <input className={`${cell} !w-20`} value={f.colour ?? ""} aria-label="Colour or gel" placeholder="e.g. L201" onChange={(e) => onEdit(f.id, { colour: e.target.value }, `${f.id}col`)} onBlur={onEndTyping} />
+                </td>
+                <td className="px-1 py-1">
                   <input className={cell} value={f.note} aria-label="Notes" onChange={(e) => onEdit(f.id, { note: e.target.value }, `${f.id}note`)} onBlur={onEndTyping} />
                 </td>
               </tr>
@@ -870,6 +875,34 @@ function Power({ l, power, setPower, opts }: { l: Lighting; power: { volts: numb
         </table>
       </div>
       <p className="text-xs text-zinc-500">Circuits is how many breakers each position needs at the load you chose, worked out from the maximum power on the data sheet. LED fixtures rarely run at full power, so treat it as the safe number.</p>
+      <div>
+        <h3 className="mb-1 text-sm font-medium text-zinc-100">Circuits</h3>
+        <div className="overflow-x-auto rounded-lg border border-zinc-800">
+          <table className="w-full min-w-[32rem] text-sm">
+            <thead>
+              <tr className="border-b border-zinc-800 text-left text-xs text-zinc-400">
+                <th className="px-3 py-2 font-medium">Circuit</th>
+                <th className="px-2 py-2 font-medium">Position</th>
+                <th className="px-2 py-2 text-right font-medium">Fixtures</th>
+                <th className="px-2 py-2 text-right font-medium">Amps</th>
+                <th className="px-2 py-2 font-medium">On it</th>
+              </tr>
+            </thead>
+            <tbody>
+              {circuitPlan(l, opts).map((c) => (
+                <tr key={c.circuit} className="border-b border-zinc-800/60 align-top">
+                  <td className="px-3 py-1.5 text-zinc-100">C{c.circuit}</td>
+                  <td className="px-2 py-1.5">{c.position || <span className="text-zinc-500">(no position)</span>}</td>
+                  <td className="px-2 py-1.5 text-right">{c.fixtures.length}</td>
+                  <td className="px-2 py-1.5 text-right">{c.amps}</td>
+                  <td className="px-2 py-1.5 text-xs text-zinc-400">{c.fixtures.join(", ")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-1 text-xs text-zinc-500">Fixtures are put on circuits in truss order, filling each breaker up to the load you chose. Fixtures with no power listed count as zero, so fill those in first.</p>
+      </div>
       <div>
         <h3 className="mb-1 text-sm font-medium text-zinc-100">Hang list</h3>
         <div className="overflow-x-auto rounded-lg border border-zinc-800">

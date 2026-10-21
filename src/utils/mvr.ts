@@ -1,4 +1,4 @@
-import { onPosition, planPoints, positionOrder, type Lighting } from "./lighting";
+import { onPosition, planPoints, positionOrder, trussPlacement, type Lighting } from "./lighting";
 
 /** MVR (My Virtual Rig) is the file grandMA3 reads as a patch. It is a zip holding GeneralSceneDescription.xml. */
 
@@ -22,9 +22,10 @@ export function mvrXml(l: Lighting, showName = "Show"): string {
           const { f, n } = fx.get(id)!;
           const name = f.label || `${f.brand} ${f.model}`.trim();
           const abs = f.universe ? (f.universe - 1) * 512 + f.address : 0;
-          // Millimetres from the stage's top left corner, as drawn on the plan. Hung 6 m up for now.
+          // Millimetres from the stage's top left corner, as drawn on the plan. Height is the truss's hang height.
           const q = pts.get(id);
-          const m = `{1,0,0}{0,1,0}{0,0,1}{${Math.round((q?.x ?? i) * 1000)},${Math.round((q?.y ?? gi * 3) * 1000)},6000}`;
+          const z = Math.round((g.name === "No truss" ? 0 : trussPlacement(l, g.name).h) * 1000);
+          const m = `{1,0,0}{0,1,0}{0,0,1}{${Math.round((q?.x ?? i) * 1000)},${Math.round((q?.y ?? gi * 3) * 1000)},${z}}`;
           return `          <Fixture name="${esc(name)}" uuid="${uuid()}">
             <Matrix>${m}</Matrix>
             <GDTFSpec>${esc(`${f.brand}@${f.model}`.replace(/^@/, ""))}.gdtf</GDTFSpec>

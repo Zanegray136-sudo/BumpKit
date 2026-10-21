@@ -26,14 +26,18 @@ export type LFixture = {
   /** Where it hangs, e.g. "Truss 1" or "FOH" */
   position: string;
   note: string;
+  /** Gel, filter or colour note, e.g. "L201" */
+  colour?: string;
   /** Spot on the rig plot, when it has been placed */
   x?: number;
   y?: number;
 };
 
 /** Where a truss sits on the stage plan. Metres from the stage's top left; rot is degrees; len is metres. */
-export type Placement = { x: number; y: number; rot: number; len: number };
-export type Plan = { w: number; d: number; trusses: Record<string, Placement> };
+export type Placement = { x: number; y: number; rot: number; len: number; /** hang height in metres */ h: number };
+/** Things on the stage that are not lights: risers, screens, FOH and so on. Sizes in metres. */
+export type PlanObject = { id: string; kind: "riser" | "screen" | "foh" | "marker" | "box"; name: string; x: number; y: number; w: number; d: number; rot: number };
+export type Plan = { w: number; d: number; trusses: Record<string, Placement>; objects?: PlanObject[] };
 
 /** One DMX node (or console output) on the network. `ports` holds the universe each output sends, 0 for none. */
 export type NetNode = { id: string; name: string; model: string; ip: string; switchPort: string; ports: number[]; note: string };
@@ -125,6 +129,8 @@ export function parseLighting(raw: unknown): Lighting {
       f.x = Math.round(o.x);
       f.y = Math.round(o.y);
     }
+    const colour = str(o.colour, 40).trim();
+    if (colour) f.colour = colour;
     fixtures.push(f);
   }
   const positions = Array.isArray(listed) ? [...new Set(listed.filter((p): p is string => typeof p === "string").map((p) => p.trim().slice(0, 60)).filter(Boolean))].slice(0, 200) : undefined;
@@ -163,10 +169,22 @@ function parsePlan(raw: unknown): Plan | undefined {
     for (const [k, v] of Object.entries(o.trusses as Record<string, unknown>).slice(0, 200)) {
       if (!v || typeof v !== "object") continue;
       const p = v as Record<string, unknown>;
-      trusses[k.slice(0, 60)] = { x: num(p.x, -500, 500, 0), y: num(p.y, -500, 500, 0), rot: num(p.rot, -360, 360, 0), len: num(p.len, 0.5, 100, 4) };
+      trusses[k.slice(0, 60)] = { x: num(p.x, -500, 500, 0), y: num(p.y, -500, 500, 0), rot: num(p.rot, -360, 360, 0), len: num(p.len, 0.5, 100, 4), h: num(p.h, 0, 100, 6) };
     }
   }
-  return { w: num(o.w, 1, 200, 12), d: num(o.d, 1, 200, 8), trusses };
+  const objects: PlanObject[] = [];
+  const kinds = ["riser", "screen", "foh", "marker", "box"];
+  if (Array.isArray((o as { objects?: unknown }).objects)) {
+    for (const r of (o as { objects: unknown[] }).objects.slice(0, 300)) {
+      if (!r || typeof r !== "object") continue;
+      const q = r as Record<string, unknown>;
+      const kind = kinds.includes(q.kind as string) ? (q.kind as PlanObject["kind"]) : "box";
+      objects.push({ id: str(q.id, 40) || newFixtureId(), kind, name: str(q.name, 60), x: num(q.x, -500, 500, 0), y: num(q.y, -500, 500, 0), w: num(q.w, 0.1, 200, 2), d: num(q.d, 0.1, 200, 1), rot: num(q.rot, -360, 360, 0) });
+    }
+  }
+  const out: Plan = { w: num(o.w, 1, 200, 12), d: num(o.d, 1, 200, 8), trusses };
+  if (objects.length) out.objects = objects;
+  return out;
 }
 
 /** Turns the old lighting table (rows with a quantity) into one fixture per unit. */
@@ -622,7 +640,7 @@ export function sorted(l: Lighting, by: SortBy): LFixture[] {
   return list;
 }
 
-export const patchHeader = ["Unit", "Label", "Fixture", "Mode", "Channels", "Universe", "Address", "Ends", "Position", "Watts", "Weight (kg)", "Notes"];
+export const patchHeader = ["Unit", "Label", "Fixture", "Mode", "Channels", "Universe", "Address", "Ends", "Position", "Watts", "Weight (kg)", "Notes", "Colour"];
 
 export function patchRows(l: Lighting, by: SortBy = "listed"): string[][] {
   return sorted(l, by).map((f, i) => [
@@ -638,6 +656,7 @@ export function patchRows(l: Lighting, by: SortBy = "listed"): string[][] {
     f.watts ? String(f.watts) : "",
     f.kg ? String(f.kg) : "",
     f.note,
+    f.colour ?? "",
   ]);
 }
 
@@ -690,6 +709,7 @@ export function importPatchCsv(text: string): Lighting {
   const iW = col("watts", "power");
   const iKg = col("weight (kg)", "weight", "kg");
   const iNote = col("notes", "note");
+  const iColour = col("colour", "color", "gel");
   const get = (r: string[], i: number) => (i >= 0 ? (r[i] ?? "").trim() : "");
   const fixtures = rows.slice(1).map((r) => {
     const fixture = get(r, iFix) || "Fixture";
@@ -707,6 +727,7 @@ export function importPatchCsv(text: string): Lighting {
       address: Number(get(r, iA)) || 0,
       position: get(r, iPos),
       note: get(r, iNote),
+      colour: get(r, iColour),
     };
   });
   return parseLighting({ fixtures });
@@ -730,7 +751,7 @@ export function trussPlacement(l: Lighting, name: string): Placement {
   const order = positionOrder(l);
   const i = Math.max(0, order.indexOf(name));
   const n = onPosition(l, name).length;
-  return { x: r1(p.w / 2), y: r1(((i + 1) * p.d) / (order.length + 1)), rot: 0, len: Math.max(2, n) };
+  return { x: r1(p.w / 2), y: r1(((i + 1) * p.d) / (order.length + 1)), rot: 0, len: Math.max(2, n), h: 6 };
 }
 
 export function placeTruss(l: Lighting, name: string, patch: Partial<Placement>): Lighting {
@@ -740,6 +761,7 @@ export function placeTruss(l: Lighting, name: string, patch: Partial<Placement>)
   next.x = r1(next.x);
   next.y = r1(next.y);
   next.len = Math.max(0.5, Math.min(100, r1(next.len)));
+  next.h = Math.max(0, Math.min(100, r1(next.h)));
   next.rot = ((Math.round(next.rot) % 360) + 360) % 360;
   return { ...l, plan: { ...p, trusses: { ...p.trusses, [name]: next } } };
 }
@@ -768,6 +790,79 @@ export function planPoints(l: Lighting): PlanPoint[] {
   for (const f of l.fixtures.filter((x) => !x.position.trim())) {
     if (typeof f.x === "number" && typeof f.y === "number") out.push({ id: f.id, x: f.x / 100, y: f.y / 100, onTruss: "", slot: 0, placed: true });
     else out.push({ id: f.id, x: r1(0.5 + k++ * 0.8), y: p.d + 2.6, onTruss: "", slot: 0, placed: false });
+  }
+  return out;
+}
+
+
+// ---------------------------------------------------------------- stage objects
+
+export const objectKinds: Record<PlanObject["kind"], { label: string; w: number; d: number }> = {
+  riser: { label: "Riser", w: 2, d: 2 },
+  screen: { label: "LED screen", w: 6, d: 0.3 },
+  foh: { label: "FOH", w: 3, d: 2 },
+  marker: { label: "Marker", w: 0.6, d: 0.6 },
+  box: { label: "Box", w: 2, d: 1 },
+};
+
+export function addObject(l: Lighting, kind: PlanObject["kind"], name = ""): Lighting {
+  const p = planOf(l);
+  const k = objectKinds[kind];
+  const o: PlanObject = { id: newFixtureId(), kind, name: name.trim() || k.label, x: r1(p.w / 2), y: r1(p.d / 2), w: k.w, d: k.d, rot: 0 };
+  return { ...l, plan: { ...p, objects: [...(p.objects ?? []), o].slice(0, 300) } };
+}
+
+export function patchObject(l: Lighting, id: string, patch: Partial<Omit<PlanObject, "id" | "kind">>): Lighting {
+  const p = planOf(l);
+  return {
+    ...l,
+    plan: {
+      ...p,
+      objects: (p.objects ?? []).map((o) => {
+        if (o.id !== id) return o;
+        const n = { ...o, ...patch };
+        n.x = r1(n.x);
+        n.y = r1(n.y);
+        n.w = Math.max(0.1, Math.min(200, r1(n.w)));
+        n.d = Math.max(0.1, Math.min(200, r1(n.d)));
+        n.rot = ((Math.round(n.rot) % 360) + 360) % 360;
+        return n;
+      }),
+    },
+  };
+}
+
+export function removeObject(l: Lighting, id: string): Lighting {
+  const p = planOf(l);
+  return { ...l, plan: { ...p, objects: (p.objects ?? []).filter((o) => o.id !== id) } };
+}
+
+// ---------------------------------------------------------------- circuits
+
+export type Circuit = { circuit: number; position: string; fixtures: string[]; watts: number; amps: number };
+
+/**
+ * Splits the rig onto breakers, truss by truss in the order fixtures hang, so each circuit stays within the
+ * breaker's rating at the load chosen. A fixture too big for one breaker gets a circuit of its own.
+ */
+export function circuitPlan(l: Lighting, o: PowerOptions = {}): Circuit[] {
+  const volts = o.volts ?? 230;
+  const max = (o.breaker ?? 16) * (o.load ?? 0.8);
+  const out: Circuit[] = [];
+  const names = [...positionOrder(l), ""];
+  for (const pos of names) {
+    const list = onPosition(l, pos);
+    let cur: Circuit | null = null;
+    for (const f of list) {
+      const a = f.watts / volts;
+      if (!cur || (cur.amps + a > max + 1e-9 && cur.fixtures.length > 0)) {
+        cur = { circuit: out.length + 1, position: pos, fixtures: [], watts: 0, amps: 0 };
+        out.push(cur);
+      }
+      cur.fixtures.push(f.label || `${f.brand} ${f.model}`.trim());
+      cur.watts += f.watts;
+      cur.amps = Math.round(((cur.watts / volts) * 10)) / 10;
+    }
   }
   return out;
 }
