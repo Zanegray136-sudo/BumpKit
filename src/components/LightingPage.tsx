@@ -36,6 +36,7 @@ import {
   type PatchOptions,
   type SortBy,
 } from "../utils/lighting";
+import { downloadMvr } from "../utils/mvr";
 import { downloadLightingPdf } from "../utils/lightingPdf";
 import { loadSaved } from "../utils/projectFile";
 import { downloadCsv } from "../utils/sharedCanvas";
@@ -201,6 +202,9 @@ export default function LightingPage() {
               </button>
               <button type="button" className="menu-item" disabled={l.fixtures.length === 0} onClick={(e) => (downloadCsv(hangCsv(l), `${base}-lighting-hang-list`), closeMenu(e))}>
                 Hang list (CSV)
+              </button>
+              <button type="button" className="menu-item" disabled={l.fixtures.length === 0} onClick={(e) => (downloadMvr(l, `${base}-lighting`, showName), closeMenu(e))}>
+                grandMA3 patch (MVR)
               </button>
               <hr className="my-1 border-zinc-700" />
               <button type="button" className="menu-item" onClick={(e) => (csvInput.current?.click(), closeMenu(e))}>

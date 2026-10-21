@@ -232,3 +232,21 @@ describe("trusses", () => {
     expect(parseLighting(JSON.parse(JSON.stringify(l))).positions?.join()).toBe("A,B");
   });
 });
+
+import { mvrXml, mvrFile } from "../src/utils/mvr";
+describe("MVR export", () => {
+  it("writes layers per truss, fixture IDs and absolute addresses", () => {
+    let l = addFixtures({ fixtures: [] }, genericFixtures[0], 0, 2, "Truss 1");
+    l = autoPatch(l, { start: 2 });
+    const x = mvrXml(l);
+    expect(x.includes('<Layer name="Truss 1"')).toBe(true);
+    expect(x.includes("<Address break=\"0\">513</Address>")).toBe(true);
+    expect(x.includes("<FixtureID>2</FixtureID>")).toBe(true);
+  });
+  it("wraps it in a zip", () => {
+    const z = mvrFile(addFixtures({ fixtures: [] }, genericFixtures[0], 0, 1));
+    expect(z[0]).toBe(0x50);
+    expect(z[1]).toBe(0x4b);
+    expect(new TextDecoder().decode(z).includes("GeneralSceneDescription.xml")).toBe(true);
+  });
+});
