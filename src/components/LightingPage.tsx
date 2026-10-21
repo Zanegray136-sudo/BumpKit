@@ -17,7 +17,12 @@ import {
   firstFree,
   fmtAddress,
   hangCsv,
+  cableFor,
+  cableRuns,
   circuitPlan,
+  phasePlan,
+  typeSummary,
+  typeSummaryCsv,
   hangList,
   movePosition,
   moveFixture,
@@ -215,6 +220,9 @@ export default function LightingPage() {
               </button>
               <button type="button" className="menu-item" disabled={l.fixtures.length === 0} onClick={(e) => (downloadCsv(hangCsv(l), `${base}-lighting-hang-list`), closeMenu(e))}>
                 Hang list (CSV)
+              </button>
+              <button type="button" className="menu-item" disabled={l.fixtures.length === 0} onClick={(e) => (downloadCsv(typeSummaryCsv(l), `${base}-lighting-fixture-summary`), closeMenu(e))}>
+                Fixture summary (CSV)
               </button>
               <button type="button" className="menu-item" disabled={!l.net?.nodes.length} onClick={(e) => (downloadCsv(netCsv(l), `${base}-lighting-network`), closeMenu(e))}>
                 Network list (CSV)
@@ -694,6 +702,7 @@ function PatchTable({
             <th className="px-1 py-2 text-right font-medium">Addr</th>
             <th className="px-1 py-2 text-right font-medium">Ends</th>
             <th className="px-1 py-2 font-medium">Position</th>
+            <th className="px-1 py-2 font-medium" title="Hang height in metres. Empty means the truss's height.">Ht m</th>
             <th className="px-1 py-2 text-right font-medium">Watts</th>
             <th className="px-1 py-2 text-right font-medium">Kg</th>
             <th className="px-1 py-2 font-medium">Colour</th>
@@ -757,6 +766,9 @@ function PatchTable({
                 <td className="px-1 py-1 text-right text-zinc-500">{f.universe ? endAddress(f) : ""}</td>
                 <td className="px-1 py-1" style={{ minWidth: "8rem" }}>
                   <input className={cell} list="patch-positions" value={f.position} aria-label="Position" onChange={(e) => onEdit(f.id, { position: e.target.value }, `${f.id}pos`)} onBlur={onEndTyping} />
+                </td>
+                <td className="px-1 py-1">
+                  <input className={`${cell} !w-14`} type="number" min={0} max={100} step={0.5} value={f.h ?? ""} aria-label="Height in metres" placeholder="auto" onChange={(e) => onEdit(f.id, { h: e.target.value === "" ? undefined : Math.max(0, Number(e.target.value) || 0) }, `${f.id}h`)} onBlur={onEndTyping} />
                 </td>
                 <td className="px-1 py-1 text-right">
                   <input className={num} type="number" min={0} value={f.watts || ""} aria-label="Watts" onChange={(e) => onEdit(f.id, { watts: Number(e.target.value) }, `${f.id}w`)} onBlur={onEndTyping} />
@@ -917,23 +929,94 @@ function Power({ l, power, setPower, opts }: { l: Lighting; power: { volts: numb
                 <th className="px-2 py-2 font-medium">Position</th>
                 <th className="px-2 py-2 text-right font-medium">Fixtures</th>
                 <th className="px-2 py-2 text-right font-medium">Amps</th>
+                <th className="px-2 py-2 font-medium">Phase</th>
                 <th className="px-2 py-2 font-medium">On it</th>
               </tr>
             </thead>
             <tbody>
-              {circuitPlan(l, opts).map((c) => (
+              {phasePlan(circuitPlan(l, opts)).rows.map((c) => (
                 <tr key={c.circuit} className="border-b border-zinc-800/60 align-top">
                   <td className="px-3 py-1.5 text-zinc-100">C{c.circuit}</td>
                   <td className="px-2 py-1.5">{c.position || <span className="text-zinc-500">(no position)</span>}</td>
                   <td className="px-2 py-1.5 text-right">{c.fixtures.length}</td>
                   <td className="px-2 py-1.5 text-right">{c.amps}</td>
+                  <td className="px-2 py-1.5">L{c.phase}</td>
                   <td className="px-2 py-1.5 text-xs text-zinc-400">{c.fixtures.join(", ")}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        {(() => {
+          const ph = phasePlan(circuitPlan(l, opts));
+          return (
+            <p className="mt-1 text-xs text-zinc-400">
+              Three phase: L1 {ph.totals[0]} A, L2 {ph.totals[1]} A, L3 {ph.totals[2]} A. {ph.imbalance <= 10 ? "Well balanced." : `The busiest phase is ${ph.imbalance}% over the average, so move a circuit if you can.`}
+            </p>
+          );
+        })()}
         <p className="mt-1 text-xs text-zinc-500">Fixtures are put on circuits in truss order, filling each breaker up to the load you chose. Fixtures with no power listed count as zero, so fill those in first.</p>
+      </div>
+      <div>
+        <h3 className="mb-1 text-sm font-medium text-zinc-100">Cable runs</h3>
+        {cableRuns(l).length === 0 ? (
+          <p className="text-xs text-zinc-500">Add trusses on the Trusses tab.</p>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-zinc-800">
+            <table className="w-full min-w-[32rem] text-sm">
+              <thead>
+                <tr className="border-b border-zinc-800 text-left text-xs text-zinc-400">
+                  <th className="px-3 py-2 font-medium">Truss</th>
+                  <th className="px-2 py-2 font-medium">Power from</th>
+                  <th className="px-2 py-2 text-right font-medium">Run m</th>
+                  <th className="px-2 py-2 font-medium">Data from</th>
+                  <th className="px-2 py-2 text-right font-medium">Run m</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cableRuns(l).map((r) => (
+                  <tr key={r.position} className="border-b border-zinc-800/60">
+                    <td className="px-3 py-1.5 text-zinc-100">{r.position}</td>
+                    <td className="px-2 py-1.5 text-zinc-400">{r.powerFrom || "no distro on the plan"}</td>
+                    <td className="px-2 py-1.5 text-right">{r.power ? `${r.power} (${cableFor(r.power)} m cable)` : ""}</td>
+                    <td className="px-2 py-1.5 text-zinc-400">{r.dataFrom || "no node on the plan"}</td>
+                    <td className="px-2 py-1.5 text-right">{r.data ? `${r.data} (${cableFor(r.data)} m cable)` : ""}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p className="mt-1 text-xs text-zinc-500">Measured from the nearest Power distro and Data node you put on the Stage plan: across the floor at right angles, up to the truss and along to its far end, plus 15% slack. Check against the real route.</p>
+      </div>
+      <div>
+        <h3 className="mb-1 text-sm font-medium text-zinc-100">Fixture summary</h3>
+        <div className="overflow-x-auto rounded-lg border border-zinc-800">
+          <table className="w-full min-w-[32rem] text-sm">
+            <thead>
+              <tr className="border-b border-zinc-800 text-left text-xs text-zinc-400">
+                <th className="px-3 py-2 font-medium">Fixture</th>
+                <th className="px-2 py-2 font-medium">Mode</th>
+                <th className="px-2 py-2 text-right font-medium">Qty</th>
+                <th className="px-2 py-2 text-right font-medium">Channels</th>
+                <th className="px-2 py-2 text-right font-medium">Watts</th>
+                <th className="px-2 py-2 text-right font-medium">Weight kg</th>
+              </tr>
+            </thead>
+            <tbody>
+              {typeSummary(l).map((r) => (
+                <tr key={`${r.fixture}|${r.mode}`} className="border-b border-zinc-800/60">
+                  <td className="px-3 py-1.5 text-zinc-100">{r.fixture}</td>
+                  <td className="px-2 py-1.5 text-zinc-400">{r.mode}</td>
+                  <td className="px-2 py-1.5 text-right">{r.qty}</td>
+                  <td className="px-2 py-1.5 text-right">{r.totalChannels}</td>
+                  <td className="px-2 py-1.5 text-right">{r.totalWatts}</td>
+                  <td className="px-2 py-1.5 text-right">{r.totalKg}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
       <div>
         <h3 className="mb-1 text-sm font-medium text-zinc-100">Hang list</h3>

@@ -24,7 +24,7 @@ export function mvrXml(l: Lighting, showName = "Show"): string {
           const abs = f.universe ? (f.universe - 1) * 512 + f.address : 0;
           // Millimetres from the stage's top left corner, as drawn on the plan. Height is the truss's hang height.
           const q = pts.get(id);
-          const z = Math.round((g.name === "No truss" ? 0 : trussPlacement(l, g.name).h) * 1000);
+          const z = Math.round((q?.h ?? (g.name === "No truss" ? 0 : trussPlacement(l, g.name).h)) * 1000);
           const m = `{1,0,0}{0,1,0}{0,0,1}{${Math.round((q?.x ?? i) * 1000)},${Math.round((q?.y ?? gi * 3) * 1000)},${z}}`;
           return `          <Fixture name="${esc(name)}" uuid="${uuid()}">
             <Matrix>${m}</Matrix>

@@ -8,7 +8,7 @@ const hue = (s: string) => {
 };
 
 type Drag = { kind: "truss"; name: string; dx: number; dy: number } | { kind: "fixture"; id: string; dx: number; dy: number } | { kind: "object"; id: string; dx: number; dy: number };
-const objectColour: Record<PlanObject["kind"], string> = { riser: "#52525b", screen: "#0e7490", foh: "#7c3aed", marker: "#ca8a04", box: "#3f3f46" };
+const objectColour: Record<PlanObject["kind"], string> = { riser: "#52525b", screen: "#0e7490", foh: "#7c3aed", marker: "#ca8a04", box: "#3f3f46", distro: "#b91c1c", node: "#15803d", followspot: "#c2410c" };
 type Label = "slot" | "name" | "address";
 
 /** A top-down plan of the stage. Trusses drag into place, loose fixtures drag anywhere, and the order along each truss comes from the Trusses tab. */
@@ -303,7 +303,7 @@ function SideView({ l, label }: { l: Lighting; label: Label }) {
   const order = positionOrder(l);
   const pts = planPoints(l);
   const byId = new Map(l.fixtures.map((f) => [f.id, f]));
-  const top = Math.max(8, ...order.map((n) => trussPlacement(l, n).h + 2));
+  const top = Math.max(8, ...order.map((n) => trussPlacement(l, n).h + 2), ...pts.map((q) => q.h + 2));
   const view = { x: -1.5, y: -top - 1, w: plan.w + 3, h: top + 3 };
   const rows: React.ReactNode[] = [];
   for (let y = 0; y <= top; y += 1) rows.push(<line key={y} x1={0} y1={-y} x2={plan.w} y2={-y} stroke="currentColor" strokeOpacity={y % 5 === 0 ? 0.25 : 0.1} strokeWidth={0.03} />);
@@ -325,24 +325,27 @@ function SideView({ l, label }: { l: Lighting; label: Label }) {
               <text x={t.x} y={-t.h - 0.45} textAnchor="middle" fontSize={0.4} fill="#d4d4d8">
                 {name} · {t.h} m
               </text>
-              {pts
-                .filter((p) => p.onTruss === name)
-                .map((p) => {
-                  const f = byId.get(p.id);
-                  if (!f) return null;
-                  const text = label === "slot" ? String(p.slot) : label === "name" ? f.label : f.universe ? fmtAddress(f.universe, f.address) : "–";
-                  return (
-                    <g key={p.id}>
-                      <circle cx={p.x} cy={-t.h + 0.55} r={0.3} fill={`hsl(${hue(`${f.brand} ${f.model}`)} 70% 55%)`} stroke="#09090b" strokeWidth={0.06} />
-                      <text x={p.x} y={-t.h + 1.35} textAnchor="middle" fontSize={0.28} fill="#e4e4e7">
-                        {text}
-                      </text>
-                    </g>
-                  );
-                })}
             </g>
           );
         })}
+        {pts
+          .filter((p) => p.placed)
+          .map((p) => {
+            const f = byId.get(p.id);
+            if (!f) return null;
+            const hang = p.onTruss ? p.h - 0.55 : p.h + 0.3;
+            const text = label === "slot" ? (p.onTruss ? String(p.slot) : "") : label === "name" ? f.label : f.universe ? fmtAddress(f.universe, f.address) : "–";
+            return (
+              <g key={p.id}>
+                <circle cx={p.x} cy={-hang} r={0.3} fill={`hsl(${hue(`${f.brand} ${f.model}`)} 70% 55%)`} stroke="#09090b" strokeWidth={0.06} />
+                {text && (
+                  <text x={p.x} y={-hang + 0.8} textAnchor="middle" fontSize={0.28} fill="#e4e4e7">
+                    {text}
+                  </text>
+                )}
+              </g>
+            );
+          })}
       </svg>
     </div>
   );

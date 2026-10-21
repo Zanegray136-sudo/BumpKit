@@ -26,6 +26,8 @@ export type LFixture = {
   /** Where it hangs, e.g. "Truss 1" or "FOH" */
   position: string;
   note: string;
+  /** Hang height in metres when it is not the truss's, e.g. on a boom or the floor */
+  h?: number;
   /** Gel, filter or colour note, e.g. "L201" */
   colour?: string;
   /** Spot on the rig plot, when it has been placed */
@@ -36,7 +38,7 @@ export type LFixture = {
 /** Where a truss sits on the stage plan. Metres from the stage's top left; rot is degrees; len is metres. */
 export type Placement = { x: number; y: number; rot: number; len: number; /** hang height in metres */ h: number; /** load limit in kg, 0 or missing for none */ maxKg?: number };
 /** Things on the stage that are not lights: risers, screens, FOH and so on. Sizes in metres. */
-export type PlanObject = { id: string; kind: "riser" | "screen" | "foh" | "marker" | "box"; name: string; x: number; y: number; w: number; d: number; rot: number };
+export type PlanObject = { id: string; kind: "riser" | "screen" | "foh" | "marker" | "box" | "distro" | "node" | "followspot"; name: string; x: number; y: number; w: number; d: number; rot: number };
 export type Plan = { w: number; d: number; trusses: Record<string, Placement>; objects?: PlanObject[] };
 
 /** One DMX node (or console output) on the network. `ports` holds the universe each output sends, 0 for none. */
@@ -129,6 +131,7 @@ export function parseLighting(raw: unknown): Lighting {
       f.x = Math.round(o.x);
       f.y = Math.round(o.y);
     }
+    if (typeof o.h === "number" && Number.isFinite(o.h)) f.h = Math.max(0, Math.min(100, Math.round(o.h * 10) / 10));
     const colour = str(o.colour, 40).trim();
     if (colour) f.colour = colour;
     fixtures.push(f);
@@ -173,7 +176,7 @@ function parsePlan(raw: unknown): Plan | undefined {
     }
   }
   const objects: PlanObject[] = [];
-  const kinds = ["riser", "screen", "foh", "marker", "box"];
+  const kinds = ["riser", "screen", "foh", "marker", "box", "distro", "node", "followspot"];
   if (Array.isArray((o as { objects?: unknown }).objects)) {
     for (const r of (o as { objects: unknown[] }).objects.slice(0, 300)) {
       if (!r || typeof r !== "object") continue;
@@ -772,7 +775,7 @@ export function placeFixtureAt(l: Lighting, id: string, x: number, y: number): L
   return { ...l, fixtures: l.fixtures.map((f) => (f.id === id ? { ...f, x: Math.round(x * 100), y: Math.round(y * 100) } : f)) };
 }
 
-export type PlanPoint = { id: string; x: number; y: number; onTruss: string; slot: number; placed: boolean };
+export type PlanPoint = { id: string; x: number; y: number; onTruss: string; slot: number; placed: boolean; /** metres above the floor */ h: number };
 
 /** Where every fixture is on the plan, in metres. Fixtures on a truss are spread along it in order. */
 export function planPoints(l: Lighting): PlanPoint[] {
@@ -783,14 +786,14 @@ export function planPoints(l: Lighting): PlanPoint[] {
     const a = (t.rot * Math.PI) / 180;
     list.forEach((f, i) => {
       const off = list.length === 1 ? 0 : -t.len / 2 + ((i + 0.5) * t.len) / list.length;
-      out.push({ id: f.id, x: r1(t.x + Math.cos(a) * off), y: r1(t.y + Math.sin(a) * off), onTruss: name, slot: i + 1, placed: true });
+      out.push({ id: f.id, x: r1(t.x + Math.cos(a) * off), y: r1(t.y + Math.sin(a) * off), onTruss: name, slot: i + 1, placed: true, h: f.h ?? t.h });
     });
   }
   const p = planOf(l);
   let k = 0;
   for (const f of l.fixtures.filter((x) => !x.position.trim())) {
-    if (typeof f.x === "number" && typeof f.y === "number") out.push({ id: f.id, x: f.x / 100, y: f.y / 100, onTruss: "", slot: 0, placed: true });
-    else out.push({ id: f.id, x: r1(0.5 + k++ * 0.8), y: p.d + 2.6, onTruss: "", slot: 0, placed: false });
+    if (typeof f.x === "number" && typeof f.y === "number") out.push({ id: f.id, x: f.x / 100, y: f.y / 100, onTruss: "", slot: 0, placed: true, h: f.h ?? 0 });
+    else out.push({ id: f.id, x: r1(0.5 + k++ * 0.8), y: p.d + 2.6, onTruss: "", slot: 0, placed: false, h: f.h ?? 0 });
   }
   return out;
 }
@@ -804,6 +807,9 @@ export const objectKinds: Record<PlanObject["kind"], { label: string; w: number;
   foh: { label: "FOH", w: 3, d: 2 },
   marker: { label: "Marker", w: 0.6, d: 0.6 },
   box: { label: "Box", w: 2, d: 1 },
+  distro: { label: "Power distro", w: 1, d: 0.6 },
+  node: { label: "Data node", w: 0.8, d: 0.5 },
+  followspot: { label: "Follow spot", w: 1, d: 1 },
 };
 
 export function addObject(l: Lighting, kind: PlanObject["kind"], name = ""): Lighting {
@@ -1004,3 +1010,76 @@ export function applyLayout(l: Lighting, layout: RigLayout): Lighting {
   }
   return out;
 }
+
+
+// ---------------------------------------------------------------- cable runs, phases, summary
+
+/** Cable lengths to buy, in metres, shortest first. */
+export const cableLengths = [2, 5, 10, 15, 20, 25, 30, 40, 50, 75, 100];
+export const cableFor = (m: number) => cableLengths.find((x) => x >= m) ?? Math.ceil(m / 25) * 25;
+
+export type Run = { position: string; power: number; powerFrom: string; data: number; dataFrom: string };
+
+const nearest = (l: Lighting, kind: PlanObject["kind"], x: number, y: number) => {
+  let best: { o: PlanObject; d: number } | null = null;
+  for (const o of planOf(l).objects ?? []) {
+    if (o.kind !== kind) continue;
+    const d = Math.abs(o.x - x) + Math.abs(o.y - y);
+    if (!best || d < best.d) best = { o, d };
+  }
+  return best;
+};
+
+/**
+ * How far each truss is from the nearest power distro and data node on the plan: the way across the floor
+ * (at right angles, as cable is laid), up to the truss and a bit extra to the farthest fixture, plus 15% slack.
+ * Trusses with no distro or node drawn get 0.
+ */
+export function cableRuns(l: Lighting): Run[] {
+  return positionOrder(l).map((name) => {
+    const t = trussPlacement(l, name);
+    const reach = t.len / 2;
+    const pw = nearest(l, "distro", t.x, t.y);
+    const dt = nearest(l, "node", t.x, t.y);
+    const run = (b: { o: PlanObject; d: number } | null) => (b ? Math.round((b.d + t.h + reach) * 1.15 * 10) / 10 : 0);
+    return { position: name, power: run(pw), powerFrom: pw?.o.name ?? "", data: run(dt), dataFrom: dt?.o.name ?? "" };
+  });
+}
+
+export type PhasePlan = { rows: (Circuit & { phase: 1 | 2 | 3 })[]; totals: [number, number, number]; imbalance: number };
+
+/** Spreads circuits over three phases, biggest first onto the lightest phase. Imbalance is how far the busiest phase is above the average, in percent. */
+export function phasePlan(circuits: Circuit[]): PhasePlan {
+  const totals: [number, number, number] = [0, 0, 0];
+  const phaseOf = new Map<number, 1 | 2 | 3>();
+  for (const c of [...circuits].sort((a, b) => b.amps - a.amps || a.circuit - b.circuit)) {
+    let k = 0;
+    if (totals[1] < totals[k]) k = 1;
+    if (totals[2] < totals[k]) k = 2;
+    totals[k] += c.amps;
+    phaseOf.set(c.circuit, (k + 1) as 1 | 2 | 3);
+  }
+  const sum = totals[0] + totals[1] + totals[2];
+  const avg = sum / 3;
+  const rounded = totals.map((t) => Math.round(t * 10) / 10) as [number, number, number];
+  return { rows: circuits.map((c) => ({ ...c, phase: phaseOf.get(c.circuit)! })), totals: rounded, imbalance: avg > 0 ? Math.round(((Math.max(...totals) - avg) / avg) * 100) : 0 };
+}
+
+export type TypeRow = { fixture: string; mode: string; qty: number; channels: number; totalChannels: number; watts: number; totalWatts: number; kg: number; totalKg: number };
+/** One row per fixture type and mode, with totals. */
+export function typeSummary(l: Lighting): TypeRow[] {
+  const m = new Map<string, TypeRow>();
+  for (const f of l.fixtures) {
+    const k = `${f.brand} ${f.model}`.trim();
+    const key = `${k}|${f.mode}`;
+    const e = m.get(key) ?? { fixture: k, mode: f.mode, qty: 0, channels: f.channels, totalChannels: 0, watts: f.watts, totalWatts: 0, kg: f.kg, totalKg: 0 };
+    e.qty++;
+    e.totalChannels += f.channels;
+    e.totalWatts += f.watts;
+    e.totalKg = Math.round((e.totalKg + f.kg) * 10) / 10;
+    m.set(key, e);
+  }
+  return [...m.values()].sort((a, b) => b.qty - a.qty || a.fixture.localeCompare(b.fixture));
+}
+export const typeSummaryCsv = (l: Lighting) =>
+  [["Fixture", "Mode", "Qty", "Channels each", "Channels total", "Watts each", "Watts total", "Kg each", "Kg total"], ...typeSummary(l).map((r) => [r.fixture, r.mode, r.qty, r.channels, r.totalChannels, r.watts || "", r.totalWatts || "", r.kg || "", r.totalKg || ""])].map((r) => r.map(csvCell).join(",")).join("\n") + "\n";

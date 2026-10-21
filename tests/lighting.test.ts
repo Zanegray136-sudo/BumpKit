@@ -405,3 +405,47 @@ describe("more lighting tools", () => {
     expect(planOf(l).w).toBe(12);
   });
 });
+
+import { cableFor, cableRuns, phasePlan, typeSummary, typeSummaryCsv } from "../src/utils/lighting";
+describe("heights, runs, phases and summary", () => {
+  const def = { brand: "Robe", model: "Test", group: "Moving heads", modes: [{ name: "M", channels: 20 }], watts: 460, kg: 20 };
+  it("uses a fixture's own height and keeps it in a saved show", () => {
+    let l = addFixtures({ fixtures: [] }, def, 0, 2, "T");
+    l = placeTruss(l, "T", { h: 6 });
+    l = patchFixture(l, l.fixtures[1].id, { h: 2.5 });
+    expect(planPoints(l).map((p) => p.h).join()).toBe("6,2.5");
+    expect(mvrXml(l).includes(",2500}")).toBe(true);
+    expect(parseLighting(JSON.parse(JSON.stringify(l))).fixtures[1].h).toBe(2.5);
+    l = patchFixture(l, l.fixtures[1].id, { h: undefined });
+    expect(planPoints(l)[1].h).toBe(6);
+  });
+  it("measures cable runs to the nearest distro and node", () => {
+    let l = addFixtures({ fixtures: [] }, def, 0, 2, "T");
+    l = placeTruss(l, "T", { x: 6, y: 4, len: 4, h: 6 });
+    expect(cableRuns(l)[0].power).toBe(0);
+    l = addObject(addObject(l, "distro", "Distro SL"), "node", "Node SR");
+    const [d, n] = planOf(l).objects!;
+    l = patchObject(patchObject(l, d.id, { x: 0, y: 4 }), n.id, { x: 12, y: 4 });
+    const r = cableRuns(l)[0];
+    expect(r.powerFrom).toBe("Distro SL");
+    expect(r.power).toBe(Math.round((6 + 6 + 2) * 1.15 * 10) / 10);
+    expect(cableFor(r.power)).toBe(20);
+    expect(cableFor(5)).toBe(5);
+    expect(cableFor(5.1)).toBe(10);
+  });
+  it("balances circuits across three phases", () => {
+    const c = [8, 8, 8, 4, 4, 4].map((a, i) => ({ circuit: i + 1, position: "T", fixtures: ["x"], watts: a * 230, amps: a }));
+    const p = phasePlan(c);
+    expect(p.totals.join()).toBe("12,12,12");
+    expect(p.imbalance).toBe(0);
+    expect(new Set(p.rows.map((r) => r.phase)).size).toBe(3);
+  });
+  it("sums fixture types and writes the summary CSV", () => {
+    const l = addFixtures(addFixtures({ fixtures: [] }, def, 0, 3), { ...def, model: "B" }, 0, 1);
+    const s = typeSummary(l);
+    expect(s[0].qty).toBe(3);
+    expect(s[0].totalChannels).toBe(60);
+    expect(s[0].totalWatts).toBe(1380);
+    expect(typeSummaryCsv(l).split("\n")[0].startsWith("Fixture,Mode,Qty")).toBe(true);
+  });
+});

@@ -1,4 +1,4 @@
-import { circuitPlan, endAddress, legendOf, fmtAddress, hangList, onPosition, planOf, planPoints, positionOrder, positionTotals, sorted, totals, trussPlacement, usage, type Lighting, type PowerOptions } from "./lighting";
+import { cableFor, cableRuns, circuitPlan, endAddress, legendOf, phasePlan, typeSummary, fmtAddress, hangList, onPosition, planOf, planPoints, positionOrder, positionTotals, sorted, totals, trussPlacement, usage, type Lighting, type PowerOptions } from "./lighting";
 import { netOf, netRows, netHeader, netChecks } from "./lightingNet";
 
 /** A landscape PDF: the patch list by address, the universes, then power, weight and the hang list. */
@@ -231,16 +231,41 @@ export async function downloadLightingPdf(l: Lighting, showName: string, fileBas
           doc.text(String(q.slot), SX(q.x), SY(t.h) + 6.4, { align: "center" });
         }
       }
+      for (const q of planPoints(l).filter((p) => !p.onTruss && p.placed)) {
+        const f = byId.get(q.id);
+        if (!f) continue;
+        const [r, g, b] = hsl(hue(`${f.brand} ${f.model}`));
+        doc.setFillColor(r, g, b);
+        doc.setDrawColor(30, 30, 30);
+        doc.setLineWidth(0.2);
+        doc.circle(SX(q.x), SY(q.h + 0.3), 1.6, "FD");
+      }
     }
   }
 
   // ---- circuits
-  const cp = circuitPlan(l, opts);
-  if (cp.length) {
+  const cp = phasePlan(circuitPlan(l, opts));
+  if (cp.rows.length) {
     table(
-      `Circuits (${volts} V, ${opts.breaker ?? 16} A at ${Math.round((opts.load ?? 0.8) * 100)}%)`,
-      [{ t: "Circuit", w: 16 }, { t: "Position", w: 40 }, { t: "Fixtures", w: 16, right: true }, { t: "Amps", w: 16, right: true }, { t: "On it", w: 150 }],
-      cp.map((c) => [`C${c.circuit}`, c.position || "(no position)", String(c.fixtures.length), String(c.amps), c.fixtures.join(", ")])
+      `Circuits (${volts} V, ${opts.breaker ?? 16} A at ${Math.round((opts.load ?? 0.8) * 100)}%). Phases: L1 ${cp.totals[0]} A, L2 ${cp.totals[1]} A, L3 ${cp.totals[2]} A`,
+      [{ t: "Circuit", w: 16 }, { t: "Position", w: 40 }, { t: "Fixtures", w: 16, right: true }, { t: "Amps", w: 16, right: true }, { t: "Phase", w: 14 }, { t: "On it", w: 136 }],
+      cp.rows.map((c) => [`C${c.circuit}`, c.position || "(no position)", String(c.fixtures.length), String(c.amps), `L${c.phase}`, c.fixtures.join(", ")])
+    );
+  }
+  const runs = cableRuns(l);
+  if (runs.some((r) => r.power || r.data)) {
+    table(
+      "Cable runs (estimate)",
+      [{ t: "Truss", w: 40 }, { t: "Power from", w: 36 }, { t: "Run m", w: 18, right: true }, { t: "Cable m", w: 18, right: true }, { t: "Data from", w: 36 }, { t: "Run m", w: 18, right: true }, { t: "Cable m", w: 18, right: true }],
+      runs.map((r) => [r.position, r.powerFrom, r.power ? String(r.power) : "", r.power ? String(cableFor(r.power)) : "", r.dataFrom, r.data ? String(r.data) : "", r.data ? String(cableFor(r.data)) : ""])
+    );
+  }
+  const ts = typeSummary(l);
+  if (ts.length) {
+    table(
+      "Fixture summary",
+      [{ t: "Fixture", w: 60 }, { t: "Mode", w: 40 }, { t: "Qty", w: 12, right: true }, { t: "Channels", w: 20, right: true }, { t: "Watts", w: 18, right: true }, { t: "Weight kg", w: 20, right: true }],
+      [...ts.map((r) => [r.fixture, r.mode, String(r.qty), String(r.totalChannels), String(r.totalWatts), String(r.totalKg)]), ["Total", "", String(t.fixtures), String(t.channels), String(t.watts), String(t.kg)]]
     );
   }
 
