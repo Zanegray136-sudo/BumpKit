@@ -52,14 +52,15 @@ import {
   type SortBy,
 } from "../utils/lighting";
 import Network from "./Network";
+import LightingSidebar, { type LightingStep } from "./LightingSidebar";
 import StagePlan from "./StagePlan";
-import { netCsv } from "../utils/lightingNet";
+import { netChecks, netCsv } from "../utils/lightingNet";
 import { downloadMvr } from "../utils/mvr";
 import { downloadLightingPdf } from "../utils/lightingPdf";
 import { loadSaved } from "../utils/projectFile";
 import { downloadCsv } from "../utils/sharedCanvas";
 
-type Tab = "patch" | "trusses" | "plan" | "network" | "universes" | "power";
+type Tab = "patch" | "trusses" | "plan" | "network" | "universes" | "power" | "exports";
 type AutoMode = "off" | "new" | "all";
 const allDefs: FixtureDef[] = [...libFixtures, ...genericFixtures];
 const defOf = (f: LFixture) => allDefs.find((d) => fixtureKey(d) === `${f.brand} ${f.model}`.trim());
@@ -76,6 +77,7 @@ export default function LightingPage() {
   const hist = useRef<{ past: Lighting[]; future: Lighting[] }>({ past: [], future: [] });
   const [, bump] = useState(0);
   const [tab, setTab] = useState<Tab>("patch");
+  const [menuOpen, setMenuOpen] = useState(false);
   const [sel, setSel] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<SortBy>("listed");
   const [filter, setFilter] = useState("");
@@ -198,56 +200,186 @@ export default function LightingPage() {
   const small = "!px-2.5 !py-1.5 text-sm";
   const sorting = sortBy !== "listed";
 
-  return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <header className="border-b border-zinc-800 bg-zinc-900">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <div className="min-w-0">
-            <a href="#/hub" className="text-xs text-zinc-400 hover:text-zinc-100">
-              ‹ Bumpkit home
-            </a>
-            <h1 className="truncate text-xl font-semibold text-zinc-50">Lighting</h1>
-            <p className="truncate text-xs text-zinc-400">{showName}</p>
-          </div>
-          <details className="relative">
-            <summary className="btn cursor-pointer list-none">Export ▾</summary>
-            <div className="absolute right-0 z-20 mt-1 w-60 space-y-1 rounded-lg border border-zinc-700 bg-zinc-900 p-1.5 shadow-xl">
-              <button type="button" className="menu-item" disabled={l.fixtures.length === 0} onClick={(e) => (void downloadLightingPdf(l, showName, base, opts), closeMenu(e))}>
-                PDF (patch, universes, power)
-              </button>
-              <button type="button" className="menu-item" disabled={l.fixtures.length === 0} onClick={(e) => (downloadCsv(patchCsv(l, "address"), `${base}-lighting-patch`), closeMenu(e))}>
-                Patch list (CSV)
-              </button>
-              <button type="button" className="menu-item" disabled={l.fixtures.length === 0} onClick={(e) => (downloadCsv(hangCsv(l), `${base}-lighting-hang-list`), closeMenu(e))}>
-                Hang list (CSV)
-              </button>
-              <button type="button" className="menu-item" disabled={l.fixtures.length === 0} onClick={(e) => (downloadCsv(typeSummaryCsv(l), `${base}-lighting-fixture-summary`), closeMenu(e))}>
-                Fixture summary (CSV)
-              </button>
-              <button type="button" className="menu-item" disabled={!l.net?.nodes.length} onClick={(e) => (downloadCsv(netCsv(l), `${base}-lighting-network`), closeMenu(e))}>
-                Network list (CSV)
-              </button>
-              <button type="button" className="menu-item" disabled={l.fixtures.length === 0} onClick={(e) => (downloadMvr(l, `${base}-lighting`, showName), closeMenu(e))}>
-                grandMA3 patch (MVR)
-              </button>
-              <hr className="my-1 border-zinc-700" />
-              <button type="button" className="menu-item" onClick={(e) => (csvInput.current?.click(), closeMenu(e))}>
-                Import fixtures from CSV…
-              </button>
-            </div>
-          </details>
-          <input ref={csvInput} type="file" accept=".csv,text/csv" hidden onChange={(e) => (e.target.files?.[0] && void importCsv(e.target.files[0]), (e.target.value = ""))} />
-        </div>
-      </header>
+  const steps: LightingStep[] = [
+    { id: "patch", label: "Fixtures and patch", done: l.fixtures.length > 0 && l.fixtures.every((f) => f.universe > 0), issue: checks.some((c) => c.level === "error") ? "error" : checks.some((c) => c.level === "warn") ? "warn" : undefined },
+    { id: "trusses", label: "Trusses", done: positions.length > 0 && positions.every((p) => l.fixtures.some((f) => f.position.trim() === p)) },
+    { id: "plan", label: "Stage plan", done: positions.length > 0 && positions.every((p) => !!l.plan?.trusses[p]) },
+    { id: "network", label: "Network", done: (l.net?.nodes.length ?? 0) > 0 && netChecks(l).length === 0, issue: netChecks(l).some((c) => c.level === "error") ? "error" : netChecks(l).length ? "warn" : undefined },
+    { id: "universes", label: "Universes", done: usage(l).length > 0 && l.fixtures.every((f) => f.universe > 0) },
+    { id: "power", label: "Power and weight", done: l.fixtures.length > 0 && tot.unknownPower === 0 && tot.unknownWeight === 0, issue: loadChecks(l).some((c) => c.level === "error") ? "error" : undefined },
+    { id: "exports", label: "Exports", done: false },
+  ];
+  const stepName = steps.find((x) => x.id === tab)?.label ?? "";
+  const pick = (id: string) => {
+    setTab(id as Tab);
+    setMenuOpen(false);
+  };
 
-      <main className="mx-auto max-w-7xl space-y-3 px-4 py-4 sm:px-6">
-        <div className="flex flex-wrap items-center gap-2">
-          <button type="button" className={`btn ${small}`} disabled={hist.current.past.length === 0} onClick={undo}>
-            ↶ Undo
-          </button>
-          <button type="button" className={`btn ${small}`} disabled={hist.current.future.length === 0} onClick={redo}>
-            Redo ↷
-          </button>
+  const sectionEl = (
+          <section className="panel min-w-0 !p-3" aria-label={stepName}>
+            {tab === "patch" && (
+              <>
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <input className="input !w-56 !py-1.5" type="search" placeholder="Search the patch" aria-label="Search the patch" value={filter} onChange={(e) => setFilter(e.target.value)} />
+                  <label className="flex items-center gap-1.5 text-xs text-zinc-400">
+                    Show by
+                    <select className="input !w-32 !py-1" value={sortBy} onChange={(e) => setSortBy(e.target.value as SortBy)}>
+                      <option value="listed">The list</option>
+                      <option value="address">Address</option>
+                      <option value="position">Position</option>
+                    </select>
+                  </label>
+                  <span className="ml-auto text-xs text-zinc-500">
+                    {l.fixtures.length} fixtures, {tot.channels} channels
+                  </span>
+                </div>
+                {sel.length > 0 && (
+                  <BulkBar
+                    count={sel.length}
+                    positions={positions}
+                    onSwap={(d) => (commit(settle(swapFixtures(l, sel, d), "structure")), flash(`Swapped ${sel.length} to ${fixtureKey(d)}. Check the addresses still fit.`))}
+                    onPosition={(p) => commit(settle(placeFixtures(l, sel, p), "structure"))}
+                    onDuplicate={() => (commit(settle(duplicateFixtures(l, sel), "add")), flash(auto === "off" ? "Added a copy after each one. They have no address yet." : "Added a copy after each one and patched them."))}
+                    onUnpatch={() => commit(unpatch(l, sel))}
+                    onDelete={() => (commit(settle(removeFixtures(l, sel), "structure")), setSel([]))}
+                    onClear={() => setSel([])}
+                  />
+                )}
+                <PatchTable
+                  rows={rows}
+                  empty={l.fixtures.length === 0}
+                  sel={selSet}
+                  bad={badIds}
+                  sorting={sorting}
+                  positions={positions}
+                  onToggle={toggle}
+                  onToggleAll={() => setSel(sel.length === rows.length ? [] : rows.map((r) => r.id))}
+                  onEdit={edit}
+                  onEndTyping={() => (typing.current = "")}
+                />
+              </>
+            )}
+            {tab === "trusses" && (
+              <Trusses
+                l={l}
+                auto={auto}
+                onChange={(next) => commit(settle(next, "structure"))}
+                onPick={(id) => (setSel([id]), setTab("patch"))}
+              />
+            )}
+            {tab === "plan" && <StagePlan l={l} onChange={(next) => commit(next)} onPick={(id) => (setSel([id]), setTab("patch"))} />}
+            {tab === "network" && <Network l={l} onChange={(next) => commit(next)} flash={flash} />}
+            {tab === "universes" && <Universes l={l} sel={selSet} onPick={(id) => (setTab("patch"), setSel([id]))} onFill={(u) => flash(`First free run in universe ${u}: ${firstFree(l, u, 1) || "none"}.`)} />}
+            {tab === "power" && <Power l={l} power={power} setPower={setPower} opts={opts} />}
+          </section>
+
+  );
+  const asideEl = (
+          <aside className="space-y-3" aria-label="Checks and totals">
+            <div className="panel !p-3">
+              <h2 className="panel-title">Checks{l.fixtures.length > 0 && ` (${checks.length})`}</h2>
+              {l.fixtures.length === 0 ? (
+                <p className="text-xs text-zinc-500">Add fixtures from the list on the left.</p>
+              ) : checks.length === 0 ? (
+                <p className="text-xs text-emerald-400">Everything is patched with no overlaps.</p>
+              ) : (
+                <ul className="space-y-1.5 text-xs">
+                  {checks.map((c, i) => (
+                    <li key={i}>
+                      <button type="button" className="flex w-full gap-2 text-left hover:text-zinc-50" onClick={() => (setTab("patch"), c.ids.length && setSel(c.ids))}>
+                        <span className={c.level === "error" ? "text-red-400" : c.level === "warn" ? "text-amber-400" : "text-zinc-500"} aria-hidden="true">
+                          ●
+                        </span>
+                        <span className="text-zinc-300">{c.text}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="panel !p-3">
+              <h2 className="panel-title">Totals</h2>
+              <dl className="grid grid-cols-2 gap-x-2 gap-y-1 text-sm">
+                <dt className="text-zinc-400">Fixtures</dt>
+                <dd className="text-right text-zinc-100">{tot.fixtures}</dd>
+                <dt className="text-zinc-400">Universes</dt>
+                <dd className="text-right text-zinc-100">{tot.universes}</dd>
+                <dt className="text-zinc-400">Power</dt>
+                <dd className="text-right text-zinc-100">{tot.kva} kW</dd>
+                <dt className="text-zinc-400">Current</dt>
+                <dd className="text-right text-zinc-100">
+                  {tot.amps} A at {power.volts} V
+                </dd>
+                <dt className="text-zinc-400">Weight</dt>
+                <dd className="text-right text-zinc-100">{tot.kg} kg</dd>
+              </dl>
+              {(tot.unknownPower > 0 || tot.unknownWeight > 0) && tot.fixtures > 0 && (
+                <p className="mt-2 text-xs text-amber-300">
+                  {tot.unknownPower} without power and {tot.unknownWeight} without weight, so those totals are low. Fill them in on the Patch tab.
+                </p>
+              )}
+            </div>
+            <p className="px-1 text-[11px] leading-snug text-zinc-500">Fixture modes come from the Open Fixture Library and the makers' data sheets. Check them against your fixture's manual and firmware before you patch.</p>
+          </aside>
+  );
+
+  const exportRow = (title: string, blurb: string, disabled: boolean, run: () => void, label = "Download") => (
+    <li key={title} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+      <div className="min-w-0">
+        <h3 className="text-sm font-medium text-zinc-100">{title}</h3>
+        <p className="text-xs text-zinc-500">{blurb}</p>
+      </div>
+      <button type="button" className="btn !px-3 !py-1.5 text-sm" disabled={disabled} onClick={run}>
+        {label}
+      </button>
+    </li>
+  );
+
+  return (
+    <div className="flex min-h-screen bg-zinc-950 text-zinc-100">
+      <div className="sticky top-0 hidden h-screen w-56 shrink-0 self-start lg:block">
+        <LightingSidebar steps={steps} current={tab} onSelect={pick} />
+      </div>
+      {menuOpen && (
+        <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="Steps">
+          <button type="button" className="absolute inset-0 bg-black/60" aria-label="Close the steps menu" onClick={() => setMenuOpen(false)} />
+          <div className="absolute left-0 top-0 h-full w-64 max-w-[80vw] shadow-2xl">
+            <LightingSidebar steps={steps} current={tab} onSelect={pick} />
+          </div>
+        </div>
+      )}
+
+      <div className="min-w-0 flex-1">
+        <header className="sticky top-0 z-30 border-b border-zinc-800 bg-zinc-900/95 backdrop-blur">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 sm:px-6">
+            <button type="button" className="btn !px-2.5 !py-1.5 text-sm lg:hidden" onClick={() => setMenuOpen(true)} aria-label="Open the steps menu">
+              ☰ Steps
+            </button>
+            <div className="min-w-0">
+              <h1 className="truncate text-base font-semibold text-zinc-50">{stepName}</h1>
+              <p className="truncate text-xs text-zinc-400">{showName}</p>
+            </div>
+            <dl className="ml-auto hidden flex-wrap gap-x-5 gap-y-1 text-xs sm:flex" aria-label="Rig totals">
+              {[
+                ["Fixtures", String(tot.fixtures)],
+                ["Universes", String(tot.universes)],
+                ["Power", `${tot.kva} kW`],
+                ["Weight", `${tot.kg} kg`],
+              ].map(([k, v]) => (
+                <div key={k}>
+                  <dt className="text-zinc-500">{k}</dt>
+                  <dd className="font-medium text-zinc-100">{v}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 border-t border-zinc-800 px-4 py-2 sm:px-6">
+            <button type="button" className={`btn ${small}`} disabled={hist.current.past.length === 0} onClick={undo}>
+              ↶ Undo
+            </button>
+            <button type="button" className={`btn ${small}`} disabled={hist.current.future.length === 0} onClick={redo}>
+              Redo ↷
+            </button>
           <details className="relative">
             <summary className={`btn-primary cursor-pointer list-none ${small}`}>Auto-patch ▾</summary>
             <div className="absolute left-0 z-20 mt-1 w-72 space-y-2 rounded-lg border border-zinc-700 bg-zinc-900 p-3 text-sm shadow-xl">
@@ -310,138 +442,45 @@ export default function LightingPage() {
               </button>
             </div>
           </details>
-          <span className="mx-1 hidden h-5 w-px bg-zinc-700 sm:block" />
-          <div className="flex gap-1" role="tablist" aria-label="Views">
-            {(
-              [
-                ["patch", "Patch"],
-                ["trusses", "Trusses"],
-                ["plan", "Stage plan"],
-                ["network", "Network"],
-                ["universes", "Universes"],
-                ["power", "Power and weight"],
-              ] as [Tab, string][]
-            ).map(([id, name]) => (
-              <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)} className={`rounded-md border px-3 py-1.5 text-sm ${tab === id ? "border-blue-500 bg-blue-500/20 text-blue-200" : "border-zinc-700 text-zinc-400 hover:text-zinc-100"}`}>
-                {name}
-              </button>
-            ))}
+            {msg && (
+              <p className="ml-auto rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-300" role="status">
+                {msg}
+              </p>
+            )}
           </div>
-          {msg && (
-            <p className="ml-auto rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-300" role="status">
-              {msg}
-            </p>
+        </header>
+
+        <main className="space-y-3 px-4 py-4 sm:px-6">
+          {tab === "patch" ? (
+            <div className="grid gap-3 xl:grid-cols-[18rem_minmax(0,1fr)_16rem] lg:grid-cols-[18rem_minmax(0,1fr)]">
+              <Library onAdd={add} onAddCustom={addCustom} positions={positions} />
+              <div className="min-w-0 space-y-3 lg:col-start-2 xl:col-start-auto">
+                {sectionEl}
+              </div>
+              <div className="lg:col-span-2 xl:col-span-1">{asideEl}</div>
+            </div>
+          ) : tab === "exports" ? (
+            <section className="panel !p-3" aria-label="Exports">
+              <p className="mb-3 text-sm text-zinc-400">Everything here is made from what is in the show now. Nothing leaves your browser.</p>
+              <ul className="space-y-2">
+                {exportRow("PDF pack", "Patch list, universes, power and weight, hang list, stage plan, side view, circuits, cable runs, fixture summary and network.", l.fixtures.length === 0, () => void downloadLightingPdf(l, showName, base, opts))}
+                {exportRow("grandMA3 patch (MVR)", "Trusses become layers, with fixture IDs, addresses and positions from the plan. Opens in MA3 and MA3 onPC.", l.fixtures.length === 0, () => downloadMvr(l, `${base}-lighting`, showName))}
+                {exportRow("Patch list (CSV)", "Every fixture by address, with position, colour and notes.", l.fixtures.length === 0, () => downloadCsv(patchCsv(l, "address"), `${base}-lighting-patch`))}
+                {exportRow("Hang list (CSV)", "How many of each fixture goes on each truss.", l.fixtures.length === 0, () => downloadCsv(hangCsv(l), `${base}-lighting-hang-list`))}
+                {exportRow("Fixture summary (CSV)", "Each type and mode with quantity, channels, watts and weight.", l.fixtures.length === 0, () => downloadCsv(typeSummaryCsv(l), `${base}-lighting-fixture-summary`))}
+                {exportRow("Network list (CSV)", "Each node output with its IP, switch port and universe.", !l.net?.nodes.length, () => downloadCsv(netCsv(l), `${base}-lighting-network`))}
+                {exportRow("Import fixtures from CSV", "Adds fixtures from a file with a header row: Label, Fixture, Channels, Universe, Address.", false, () => csvInput.current?.click(), "Choose a file…")}
+              </ul>
+              <input ref={csvInput} type="file" accept=".csv,text/csv" hidden onChange={(e) => (e.target.files?.[0] && void importCsv(e.target.files[0]), (e.target.value = ""))} />
+            </section>
+          ) : (
+            <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_16rem]">
+              {sectionEl}
+              {asideEl}
+            </div>
           )}
-        </div>
-
-        <div className="grid gap-3 lg:grid-cols-[18rem_minmax(0,1fr)_17rem]">
-          <Library onAdd={add} onAddCustom={addCustom} positions={positions} />
-
-          <section className="panel order-1 min-w-0 !p-3 lg:order-none" aria-label="Lighting">
-            {tab === "patch" && (
-              <>
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <input className="input !w-56 !py-1.5" type="search" placeholder="Search the patch" aria-label="Search the patch" value={filter} onChange={(e) => setFilter(e.target.value)} />
-                  <label className="flex items-center gap-1.5 text-xs text-zinc-400">
-                    Show by
-                    <select className="input !w-32 !py-1" value={sortBy} onChange={(e) => setSortBy(e.target.value as SortBy)}>
-                      <option value="listed">The list</option>
-                      <option value="address">Address</option>
-                      <option value="position">Position</option>
-                    </select>
-                  </label>
-                  <span className="ml-auto text-xs text-zinc-500">
-                    {l.fixtures.length} fixtures, {tot.channels} channels
-                  </span>
-                </div>
-                {sel.length > 0 && (
-                  <BulkBar
-                    count={sel.length}
-                    positions={positions}
-                    onSwap={(d) => (commit(settle(swapFixtures(l, sel, d), "structure")), flash(`Swapped ${sel.length} to ${fixtureKey(d)}. Check the addresses still fit.`))}
-                    onPosition={(p) => commit(settle(placeFixtures(l, sel, p), "structure"))}
-                    onDuplicate={() => (commit(settle(duplicateFixtures(l, sel), "add")), flash(auto === "off" ? "Added a copy after each one. They have no address yet." : "Added a copy after each one and patched them."))}
-                    onUnpatch={() => commit(unpatch(l, sel))}
-                    onDelete={() => (commit(settle(removeFixtures(l, sel), "structure")), setSel([]))}
-                    onClear={() => setSel([])}
-                  />
-                )}
-                <PatchTable
-                  rows={rows}
-                  empty={l.fixtures.length === 0}
-                  sel={selSet}
-                  bad={badIds}
-                  sorting={sorting}
-                  positions={positions}
-                  onToggle={toggle}
-                  onToggleAll={() => setSel(sel.length === rows.length ? [] : rows.map((r) => r.id))}
-                  onEdit={edit}
-                  onEndTyping={() => (typing.current = "")}
-                />
-              </>
-            )}
-            {tab === "trusses" && (
-              <Trusses
-                l={l}
-                auto={auto}
-                onChange={(next) => commit(settle(next, "structure"))}
-                onPick={(id) => (setSel([id]), setTab("patch"))}
-              />
-            )}
-            {tab === "plan" && <StagePlan l={l} onChange={(next) => commit(next)} onPick={(id) => (setSel([id]), setTab("patch"))} />}
-            {tab === "network" && <Network l={l} onChange={(next) => commit(next)} flash={flash} />}
-            {tab === "universes" && <Universes l={l} sel={selSet} onPick={(id) => (setTab("patch"), setSel([id]))} onFill={(u) => flash(`First free run in universe ${u}: ${firstFree(l, u, 1) || "none"}.`)} />}
-            {tab === "power" && <Power l={l} power={power} setPower={setPower} opts={opts} />}
-          </section>
-
-          <aside className="order-2 space-y-3 lg:order-none" aria-label="Checks and totals">
-            <div className="panel !p-3">
-              <h2 className="panel-title">Checks{l.fixtures.length > 0 && ` (${checks.length})`}</h2>
-              {l.fixtures.length === 0 ? (
-                <p className="text-xs text-zinc-500">Add fixtures from the list on the left.</p>
-              ) : checks.length === 0 ? (
-                <p className="text-xs text-emerald-400">Everything is patched with no overlaps.</p>
-              ) : (
-                <ul className="space-y-1.5 text-xs">
-                  {checks.map((c, i) => (
-                    <li key={i}>
-                      <button type="button" className="flex w-full gap-2 text-left hover:text-zinc-50" onClick={() => (setTab("patch"), c.ids.length && setSel(c.ids))}>
-                        <span className={c.level === "error" ? "text-red-400" : c.level === "warn" ? "text-amber-400" : "text-zinc-500"} aria-hidden="true">
-                          ●
-                        </span>
-                        <span className="text-zinc-300">{c.text}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            <div className="panel !p-3">
-              <h2 className="panel-title">Totals</h2>
-              <dl className="grid grid-cols-2 gap-x-2 gap-y-1 text-sm">
-                <dt className="text-zinc-400">Fixtures</dt>
-                <dd className="text-right text-zinc-100">{tot.fixtures}</dd>
-                <dt className="text-zinc-400">Universes</dt>
-                <dd className="text-right text-zinc-100">{tot.universes}</dd>
-                <dt className="text-zinc-400">Power</dt>
-                <dd className="text-right text-zinc-100">{tot.kva} kW</dd>
-                <dt className="text-zinc-400">Current</dt>
-                <dd className="text-right text-zinc-100">
-                  {tot.amps} A at {power.volts} V
-                </dd>
-                <dt className="text-zinc-400">Weight</dt>
-                <dd className="text-right text-zinc-100">{tot.kg} kg</dd>
-              </dl>
-              {(tot.unknownPower > 0 || tot.unknownWeight > 0) && tot.fixtures > 0 && (
-                <p className="mt-2 text-xs text-amber-300">
-                  {tot.unknownPower} without power and {tot.unknownWeight} without weight, so those totals are low. Fill them in on the Patch tab.
-                </p>
-              )}
-            </div>
-            <p className="px-1 text-[11px] leading-snug text-zinc-500">Fixture modes come from the Open Fixture Library and the makers' data sheets. Check them against your fixture's manual and firmware before you patch.</p>
-          </aside>
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }
